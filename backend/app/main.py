@@ -1,57 +1,41 @@
-import logging
-import os
-from fastapi import FastAPI, Depends
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import List, Optional, Dict
 
-from .auth import get_current_user, get_current_user_optional, require_role, User
+from .llm.adapter import get_llm
 
-logger = logging.getLogger("app.main")
-
-app = FastAPI(title="RAGEdu API (scaffold)")
-
-# Allow CORS for local dev (frontend dev server). In production tighten this.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI(title="RAGEdu API")
 
 
 @app.get("/health")
-async def health():
+def health():
     return {"status": "ok"}
 
 
-@app.get("/whoami")
-async def whoami(user: User = Depends(get_current_user)):
-    """Return the authenticated user's information. Requires a valid token."""
-    return {"sub": user.sub, "username": user.username, "email": user.email, "role": user.role}
+class RAGRequest(BaseModel):
+    prompt: str
+    # context is a list of arbitrary dicts (e.g. {"title": ..., "page": ..., "content": ...})
+    context: Optional[List[Dict]] = None
 
 
-@app.get("/protected/auth")
-async def protected_auth(user: User = Depends(get_current_user)):
-    return {"message": f"Hello {user.username}, you are authenticated as {user.role}"}
+@app.post("/rag/answer")
+def rag_answer(req: RAGRequest):
+    """Return an answer produced by the configured LLM provider.
+
+    This endpoint delegates to the LLM adapter factory get_llm(). The default
+    provider is the local StubLLM which is safe to run in development.
+    """
+    llm = get_llm()
+    try:
+        ans = llm.generate(req.prompt, req.context)
+    except Exception as e:
+        # Surface LLM errors as 500 so the frontend / tests can handle them.
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"answer": ans}
 
 
-@app.get("/protected/student")
-async def protected_student(user: User = Depends(require_role("student"))):
-    return {"message": f"Welcome student {user.username}!"}
+# Lightweight runner hint for local development
+if __name__ == "__main__":
+    import uvicorn
 
-
-@app.get("/protected/professor")
-async def protected_professor(user: User = Depends(require_role("professor"))):
-    return {"message": f"Welcome professor {user.username}!"}
-
-
-# Example endpoint which allows optional authentication and shows different views
-@app.get("/greeting")
-async def greeting(user: User | None = Depends(get_current_user_optional)):
-    if not user:
-        return {"message": "Hello anonymous visitor! Please login to access more features."}
-    if user.role == "student":
-        return {"message": f"Hey student {user.username} — check your assignments."}
-    if user.role == "professor":
-        return {"message": f"Hello professor {user.username} — manage your course here."}
-    return {"message": f"Hello {user.username} ({user.role})"}
+    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
