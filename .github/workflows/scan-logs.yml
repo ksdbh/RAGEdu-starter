@@ -1,7 +1,8 @@
 name: scan-logs
+
 on:
   schedule:
-    - cron: "23 2 * * *"
+    - cron: "23 2 * * *"   # daily at 02:23 UTC
   workflow_dispatch:
 
 permissions:
@@ -12,19 +13,18 @@ jobs:
   triage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Fetch recent logs (optional)
-        shell: bash
         run: |
           mkdir -p logs
+          # Replace this with real fetching from Sentry/Datadog/CloudWatch if desired
           echo "[]" > logs/sentry.json
 
-            - name: Analyze logs with OpenAI
-        shell: bash
+      - name: Analyze logs with OpenAI
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cat > analyze.mjs <<'NODE'
           import fs from 'fs';
@@ -32,12 +32,13 @@ jobs:
 
           const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-          // Lightweight retry for transient 429/500s
+          // Simple retry for transient 429/5xx errors
           async function withRetry(fn, {retries=3, minDelay=1000} = {}) {
-            let err;
+            let lastErr;
             for (let i = 0; i <= retries; i++) {
-              try { return await fn(); } catch (e) {
-                err = e;
+              try { return await fn(); }
+              catch (e) {
+                lastErr = e;
                 const status = e?.status || e?.code;
                 if (status === 429 || status === 500 || status === 503) {
                   const delay = minDelay * Math.pow(2, i);
@@ -47,7 +48,7 @@ jobs:
                 throw e;
               }
             }
-            throw err;
+            throw lastErr;
           }
 
           const logs = fs.existsSync('logs/sentry.json')
@@ -64,7 +65,7 @@ jobs:
 
           const resp = await withRetry(() =>
             openai.chat.completions.create({
-              model: "gpt-5-mini",
+              model: "gpt-5-mini",     // no temperature param for gpt-5 family
               messages: [
                 { role: "system", content: "Return only Markdown." },
                 { role: "user", content: prompt }
@@ -78,6 +79,12 @@ jobs:
           NODE
 
           node analyze.mjs
+
+      - name: (Debug) Print triage.md to logs
+        run: |
+          echo "---- triage.md ----"
+          cat triage.md || echo "triage.md missing"
+          echo "-------------------"
 
       - name: Create/Update issue
         uses: peter-evans/create-issue-from-file@v5
