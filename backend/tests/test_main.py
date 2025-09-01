@@ -15,13 +15,28 @@ def test_rag_answer_success():
     resp = client.post("/rag/answer", json=payload)
     assert resp.status_code == 200
     data = resp.json()
-    # Ensure the stubbed answer is returned exactly (keeps behavior explicit)
-    assert data["answer"] == "This is a stub. Retrieval and LLM will be wired in subsequent PRs."
+
+    # Ensure an answer string is returned and is non-empty
     assert isinstance(data["answer"], str)
-    assert data["citations"] == []
+    assert len(data["answer"]) > 0
+
+    # Citations should be a list with up to top_k entries; our stub corpus has >= 3
+    assert isinstance(data["citations"], list)
+    assert len(data["citations"]) == 3
+
+    # Each citation should contain title, page and snippet keys
+    for c in data["citations"]:
+        assert "title" in c
+        assert "page" in c
+        assert "snippet" in c
+
+    # Metadata should include top_k, course_id and confidence
     assert isinstance(data["metadata"], dict)
     assert data["metadata"]["top_k"] == 3
     assert data["metadata"]["course_id"] == "cs101"
+    conf = data["metadata"].get("confidence")
+    assert isinstance(conf, float)
+    assert 0.0 <= conf <= 1.0
 
 
 def test_rag_answer_invalid_top_k():
@@ -53,3 +68,7 @@ def test_rag_answer_defaults_when_omitted():
     data = resp.json()
     assert data["metadata"]["top_k"] == 5
     assert data["metadata"]["course_id"] is None
+    # confidence should be present and valid
+    conf = data["metadata"].get("confidence")
+    assert isinstance(conf, float)
+    assert 0.0 <= conf <= 1.0
