@@ -1,0 +1,56 @@
+name: scan-logs
+on:
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch recent logs (optional)
+        run: |
+          mkdir -p logs
+          echo "[]" > logs/sentry.json
+
+      - name: Analyze logs with OpenAI
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node - <<'NODE'
+          import fs from 'fs';
+          import OpenAI from 'openai';
+          const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+          const logs = fs.existsSync('logs/sentry.json') ? fs.readFileSync('logs/sentry.json','utf8') : '[]';
+          const prompt = `You are an SRE assistant. Analyze the JSON logs below:
+- Cluster similar errors
+- Suggest likely root causes
+- Propose concrete fixes
+Return Markdown only.
+Logs:
+${logs.slice(0,180000)}`;
+          const resp = await openai.chat.completions.create({
+            model: "gpt-5-thinking",
+            temperature: 0,
+            messages: [
+              { role: "system", content: "Return only Markdown." },
+              { role: "user", content: prompt }
+            ]
+          });
+          fs.writeFileSync('triage.md', resp.choices[0].message.content, 'utf8');
+          console.log('Wrote triage.md');
+          NODE
+
+      - name: Create/Update issue
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          title: "Error log triage report"
+          content-filepath: triage.md
+          labels: triage, automated

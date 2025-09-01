@@ -1,0 +1,42 @@
+name: assistant-commands
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  run:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request != null && (startsWith(github.event.comment.body, '/gen') ||
+                                                   startsWith(github.event.comment.body, '/fix') ||
+                                                   startsWith(github.event.comment.body, '/scaffold'))) ||
+      (github.event.issue.pull_request == null && (startsWith(github.event.comment.body, '/gen') ||
+                                                   startsWith(github.event.comment.body, '/fix') ||
+                                                   startsWith(github.event.comment.body, '/scaffold')))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: |
+          npm init -y
+          npm i openai@4 octokit @actions/github
+
+      - name: Run assistant
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GH_AUTOMERGE_PAT: ${{ secrets.GH_AUTOMERGE_PAT }}
+        run: node .github/assistant.mjs
