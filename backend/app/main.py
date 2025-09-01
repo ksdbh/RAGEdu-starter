@@ -4,7 +4,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, conint, constr
 
 from .rag import OpenSearchRetrieverStub, BedrockLLMClientStub, compose_citations
-from .db import DynamoDBRecorder
+from .db import DynamoDBRecorder, CourseSyllabusStore
+from . import quests as quests_module
 
 app = FastAPI(title="RAGEdu API")
 
@@ -66,6 +67,43 @@ class QuizSubmitResponse(BaseModel):
     recorded: int
 
 
+# Course / Syllabus API models
+class CourseCreate(BaseModel):
+    id: str
+    title: str
+    description: Optional[str] = None
+
+
+class WeekIn(BaseModel):
+    week: int
+    topics: List[str]
+
+
+class SyllabusCreate(BaseModel):
+    weeks: List[WeekIn]
+
+
+class QuestOut(BaseModel):
+    id: str
+    type: str
+    title: str
+    description: str
+    estimated_minutes: int
+    week: int
+    topic: str
+    progress: Optional[float] = 0.0
+
+
+class WeekOut(BaseModel):
+    week: int
+    quests: List[QuestOut]
+
+
+class QuestMapOut(BaseModel):
+    course_id: str
+    weeks: List[WeekOut]
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     """Health endpoint used by monitors and CI."""
@@ -76,6 +114,7 @@ async def health() -> HealthResponse:
 _RETRIEVER = OpenSearchRetrieverStub()
 _LLM = BedrockLLMClientStub()
 _DB = DynamoDBRecorder()  # best-effort recorder; will no-op if AWS not configured
+_COURSE_STORE = CourseSyllabusStore()
 
 
 @app.post("/rag/answer", response_model=RagResponse)
@@ -254,3 +293,55 @@ async def quiz_submit(payload: QuizSubmitRequest) -> QuizSubmitResponse:
             pass
 
     return QuizSubmitResponse(success=True, recorded=recorded)
+
+
+# -------------------------
+# Course / Syllabus endpoints
+# -------------------------
+
+@app.post("/courses", status_code=201)
+async def create_course(payload: CourseCreate) -> Dict[str, Any]:
+    """Create a course record (best-effort)."""
+    data = {"id": payload.id, "title": payload.title, "description": payload.description}
+    ok = _COURSE_STORE.create_course(payload.id, data)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to store course")
+    return {"course_id": payload.id}
+
+
+@app.post("/courses/{course_id}/syllabus", status_code=201)
+async def create_syllabus(course_id: str, payload: SyllabusCreate) -> Dict[str, Any]:
+    """Attach a syllabus to a course. The syllabus is a list of weeks each with topics."""
+    weeks_payload = [{"week": w.week, "topics": w.topics} for w in payload.weeks]
+    data = {"course_id": course_id, "weeks": weeks_payload}
+    ok = _COURSE_STORE.create_syllabus(course_id, data)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to store syllabus")
+    return {"course_id": course_id, "weeks": len(weeks_payload)}
+
+
+@app.get("/courses/{course_id}/quest-map", response_model=QuestMapOut)
+async def get_quest_map(course_id: str) -> QuestMapOut:
+    """Return a minimal quest-map view for a course based on its syllabus.
+
+    Each syllabus week is expanded into quests (read/quiz/apply) using the deterministic
+    topics_to_quests function. Progress is provided as 0.0 for the scaffold; a future
+    enhancement would surface per-user progress from a dedicated table.
+    """
+    try:
+        syllabus = _COURSE_STORE.get_syllabus(course_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Syllabus not found for course")
+
+    qm = quests_module.build_quest_map(syllabus, course_id=course_id)
+
+    # attach progress=0.0 to each quest for MVP
+    weeks_out = []
+    for w in qm.get("weeks", []):
+        quests = []
+        for q in w.get("quests", []):
+            q_out = {**q, "progress": 0.0}
+            quests.append(q_out)
+        weeks_out.append({"week": w.get("week"), "quests": quests})
+
+    return QuestMapOut(course_id=course_id, weeks=weeks_out)
