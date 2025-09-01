@@ -1,364 +1,325 @@
 import argparse
 import hashlib
-import json
 import logging
 import os
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+import re
+import sys
+from typing import Dict, List, Optional, Tuple
 
-# Lightweight logging setup for CLI usage
-logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 logger = logging.getLogger("ingest")
 
+# -----------------------------
+# PDF parsing (pypdf fallback)
+# -----------------------------
 
-@dataclass
-class Chunk:
-    id: str
-    text: str
-    start: int
-    end: int
-    metadata: Dict[str, Any]
+def parse_pdf(path: str, use_textract: bool = False) -> List[str]:
+    """Return list of page texts (1-based pages: index 0 is page 1 text).
 
-
-# -------------------------
-# PDF / Textract parser
-# -------------------------
-
-def parse_pdf_bytes(pdf_bytes: bytes, use_textract: bool = False) -> str:
-    """Parse text out of PDF bytes.
-
-    This is a best-effort parser. If use_textract is True and AWS credentials
-    + Textract are available, this implementation would call Textract. For the
-    scaffold we keep this as a safe stub that attempts a local fallback.
-
-    The fallback attempts to import pypdf (PyPDF2 successor) if available and
-    use it. If not available, we return a best-effort empty string (so CLI
-    remains safe to run in environments without extra packages).
+    - If use_textract is True, call a Textract stub (not implemented here).
+    - Otherwise try pypdf PdfReader; on any import error or parsing error return []
     """
-    # Note: We intentionally avoid making a blocking dependency on AWS or third-party
-    # PDF libs in this scaffold. If you want production parsing, implement
-    # Textract StartDocumentTextDetection + job polling for PDFs or add pypdf to
-    # requirements and use PdfReader.
-
     if use_textract:
-        try:
-            import boto3
+        logger.info("Textract mode requested; using textract_stub (best-effort)")
+        return textract_stub(path)
 
-            logger.info("Would call Textract to parse PDF (stub). Skipping actual call in scaffold.")
-            # Real implementation: call StartDocumentTextDetection and poll for job completion.
-            # We return a placeholder so the rest of the pipeline can run during local tests.
-            return ""
-        except Exception:
-            logger.exception("Textract requested but failed; falling back to local parser.")
-
-    # Local fallback using PyPDF (if installed).
     try:
-        # PyPDF2 / pypdf packages expose PdfReader in different names; try common ones.
-        try:
-            from pypdf import PdfReader  # type: ignore
-        except Exception:
-            from PyPDF2 import PdfReader  # type: ignore
+        # local import to avoid forcing dependency at package import
+        from pypdf import PdfReader  # type: ignore
 
-        reader = PdfReader(pdf_bytes if isinstance(pdf_bytes, str) else None)
-        # If PdfReader accepts a stream of bytes, we'd pass io.BytesIO(pdf_bytes).
-        # But to keep the scaffold tolerant, try both patterns.
-    except Exception:
-        try:
-            from io import BytesIO
-            from pypdf import PdfReader  # type: ignore
-
-            reader = PdfReader(BytesIO(pdf_bytes))
-        except Exception:
+        reader = PdfReader(path)
+        pages = []
+        for p in reader.pages:
             try:
-                from io import BytesIO
-                from PyPDF2 import PdfReader  # type: ignore
-
-                reader = PdfReader(BytesIO(pdf_bytes))
+                text = p.extract_text() or ""
             except Exception:
-                logger.info("No PDF parser available (pypdf / PyPDF2). Returning empty text.")
-                return ""
-
-    texts: List[str] = []
-    try:
-        for page in reader.pages:
-            try:
-                texts.append(page.extract_text() or "")
-            except Exception:
-                # Some readers have different APIs; be defensive
-                texts.append("")
-    except Exception:
-        # Fallback if reader.pages not iterable; attempt to coerce
-        logger.exception("Unexpected PDF reader shape; returning empty text.")
-        return ""
-
-    return "\n\f\n".join(texts)
-
-
-# -------------------------
-# Simple layout-aware semantic chunker
-# -------------------------
-
-def _estimate_tokens_for_text(text: str) -> int:
-    # Very rough heuristic: 1 token ~ 4 characters (depends on tokenizer)
-    return max(1, int(len(text) / 4))
-
-
-def semantic_chunk_text(
-    text: str,
-    max_tokens: int = 500,
-    overlap_tokens: int = 50,
-) -> List[Chunk]:
-    """Split text into semantic chunks.
-
-    Behavior/heuristics:
-    - Prefer splitting on paragraph boundaries (double newline) and explicit page
-      separators (form feed '\f').
-    - Break paragraphs into sentence-like units if a paragraph is too large.
-    - Ensure approximate token budget per chunk (using a simple char->token heuristic).
-    - Add overlap in tokens between consecutive chunks.
-
-    Returns a list of Chunk dataclasses, each with start/end character offsets.
-    """
-    if not text:
+                # be tolerant of strange PDFs
+                text = ""
+            pages.append(text)
+        logger.info("Parsed %d pages from %s", len(pages), path)
+        return pages
+    except Exception as e:
+        logger.exception("Failed to parse PDF with pypdf: %s", e)
         return []
 
-    # Normalize different page markers to a paragraph delimiter
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
 
-    # Split into paragraphs by double-newline or form feed (common PDF page boundary)
-    paragraphs: List[str] = []
-    for part in text.split("\f"):
-        for p in part.split("\n\n"):
-            p = p.strip()
-            if p:
-                paragraphs.append(p)
+def textract_stub(path: str) -> List[str]:
+    """Placeholder for Textract-based parsing.
 
-    # If no double-newline style paragraphs, split by single newlines but keep lines that are short
-    if not paragraphs and "\n" in text:
-        paragraphs = [ln.strip() for ln in text.split("\n") if ln.strip()]
-
-    max_chars = max(32, max_tokens * 4)  # guard lower bound
-    overlap_chars = max(0, overlap_tokens * 4)
-
-    chunks: List[Chunk] = []
-    cursor = 0  # global character offset in the normalized text
-
-    # We'll reconstruct the normalized text to calculate offsets reliably
-    normalized_text = "\n\n".join(paragraphs)
-
-    pos = 0
-    for para in paragraphs:
-        para_start = normalized_text.find(para, pos)
-        if para_start == -1:
-            # fallback to current pos
-            para_start = pos
-        para_end = para_start + len(para)
-        pos = para_end
-
-        if len(para) <= max_chars:
-            chunks.append(Chunk(id="", text=para, start=para_start, end=para_end, metadata={}))
-            continue
-
-        # Paragraph is too long; split into sentence-like pieces
-        import re
-
-        sentence_boundaries = re.split(r"(?<=[.!?])\s+", para)
-        current_piece = ""
-        piece_start_in_para = 0
-        running_idx = 0
-        for sent in sentence_boundaries:
-            if not sent:
-                continue
-            if len(current_piece) + len(sent) + 1 <= max_chars:
-                if not current_piece:
-                    piece_start_in_para = running_idx
-                    current_piece = sent
-                else:
-                    current_piece = current_piece + " " + sent
-            else:
-                # flush current_piece
-                start = para_start + piece_start_in_para
-                end = start + len(current_piece)
-                chunks.append(Chunk(id="", text=current_piece, start=start, end=end, metadata={}))
-                # start new piece
-                piece_start_in_para = running_idx
-                current_piece = sent
-            running_idx += len(sent) + 1  # account for the separator
-
-        if current_piece:
-            start = para_start + piece_start_in_para
-            end = start + len(current_piece)
-            chunks.append(Chunk(id="", text=current_piece, start=start, end=end, metadata={}))
-
-    # Now merge small adjacent chunks to better utilize space and add overlap
-    merged: List[Chunk] = []
-    for c in chunks:
-        if not merged:
-            merged.append(c)
-            continue
-        last = merged[-1]
-        # If combined size still within max_chars, merge them
-        if len(last.text) + 1 + len(c.text) <= max_chars:
-            new_text = last.text + " " + c.text
-            new_chunk = Chunk(id="", text=new_text, start=last.start, end=c.end, metadata={})
-            merged[-1] = new_chunk
-        else:
-            merged.append(c)
-
-    # Add deterministic ids and adjust for overlap
-    final_chunks: List[Chunk] = []
-    for i, c in enumerate(merged):
-        # compute id as hash of text + course if present (metadata may supply course later)
-        h = hashlib.sha256(c.text.encode("utf-8")).hexdigest()[:12]
-        chunk_id = f"chunk_{i}_{h}"
-        c.id = chunk_id
-        final_chunks.append(c)
-
-    # Create overlapping copies: we'll represent overlap by including overlap text in the next chunk's text
-    if overlap_chars > 0 and len(final_chunks) > 1:
-        overlapped: List[Chunk] = []
-        for i, c in enumerate(final_chunks):
-            text = c.text
-            start = c.start
-            end = c.end
-            if i > 0:
-                # prepend overlap from previous chunk
-                prev = overlapped[-1]
-                # compute overlap slice from prev.text (last overlap_chars)
-                overlap_text = prev.text[-overlap_chars:] if overlap_chars < len(prev.text) else prev.text
-                if overlap_text and not text.startswith(overlap_text):
-                    text = overlap_text + " " + text
-                    # adjust start backward for accurate offsets (approximate)
-                    start = max(0, start - len(overlap_text) - 1)
-            overlapped.append(Chunk(id=c.id, text=text, start=start, end=end, metadata=c.metadata))
-        final_chunks = overlapped
-
-    return final_chunks
-
-
-# -------------------------
-# Embeddings (Bedrock Titan stub)
-# -------------------------
-
-class BedrockEmbeddingClientStub:
-    """Stub for Bedrock Titan embeddings.
-
-    In the real implementation you'd call Bedrock to get embeddings for each
-    chunk. For the scaffold we provide deterministic pseudo-embeddings derived
-    from stable hashes so unit tests and local runs are repeatable.
+    For the scaffold we provide a stub that currently behaves like an empty
+    (no-op) extractor. Replace with a real Textract client/implementation when
+    wiring AWS.
     """
-
-    def embed_texts(self, texts: List[str]) -> List[List[float]]:
-        embeddings: List[List[float]] = []
-        for t in texts:
-            # deterministic pseudo-embedding: take sha256 and convert bytes to floats in [-1,1]
-            digest = hashlib.sha256(t.encode("utf-8")).digest()
-            vec = [((b / 255.0) * 2.0 - 1.0) for b in digest[:32]]  # 32-d vector
-            embeddings.append(vec)
-        return embeddings
+    logger.info("textract_stub called for %s (not implemented)", path)
+    return []
 
 
-# -------------------------
-# OpenSearch indexer (stub / lightweight)
-# -------------------------
+# -----------------------------
+# Chunker: heading-aware
+# -----------------------------
 
-class OpenSearchIndexerStub:
-    """Stub indexer. In production use opensearch-py to index vectors + metadata.
 
-    This stub records the documents it would index so tests or local inspection can
-    validate behavior without a running OpenSearch cluster.
-    """
-
-    def __init__(self):
-        self.indexed: List[Dict[str, Any]] = []
-
-    def index_chunks(self, index_name: str, chunks: List[Chunk], embeddings: List[List[float]], course_id: Optional[str] = None):
-        assert len(chunks) == len(embeddings), "chunks and embeddings length mismatch"
-        for c, emb in zip(chunks, embeddings):
-            doc = {
-                "chunk_id": c.id,
-                "text": c.text,
-                "start": c.start,
-                "end": c.end,
-                "embedding": emb,
-                "course_id": course_id,
-            }
-            self.indexed.append(doc)
-        logger.info("Indexed %d chunks into %s (stub).", len(chunks), index_name)
+def _is_heading(line: str) -> bool:
+    s = line.strip()
+    if not s:
+        return False
+    # heuristic 1: short line that is mostly uppercase
+    if len(s) < 120 and sum(c.isalpha() for c in s) >= 3 and s.upper() == s:
         return True
+    # heuristic 2: numbered heading like '1.2 Foo' or '2) Bar'
+    if re.match(r"^\d+[\d\.\)\-]*\s+.+", s):
+        return True
+    # heuristic 3: ends with ':' (labels)
+    if s.endswith(":") and len(s) < 200:
+        return True
+    return False
 
 
-# -------------------------
-# Top-level ingestion orchestration
-# -------------------------
+def _slugify(s: str) -> str:
+    s2 = s.strip().lower()
+    s2 = re.sub(r"[^a-z0-9]+", "-", s2)
+    s2 = re.sub(r"-+", "-", s2)
+    return s2.strip("-")[:60]
 
-def ingest_file(path: str, course_id: Optional[str] = None, use_textract: bool = False) -> Dict[str, Any]:
-    """Run the ingestion pipeline for a single file.
 
-    Steps (scaffold):
-    1. Read bytes from provided path.
-    2. Parse text (Textract stub or local fallback).
-    3. Chunk text semantically.
-    4. Create embeddings via Bedrock stub.
-    5. Index to OpenSearch stub.
+def chunk_pages(
+    pages: List[str], course_id: Optional[str] = None, max_chars: int = 1000
+) -> List[Dict]:
+    """Chunk a list of page texts into heading-aware passages.
 
-    Returns a dictionary with summary info for CLI-friendly output.
+    Returns list of dicts:
+      {"text": ..., "metadata": {"course_id":..., "page": int, "section": str}}
+
+    Each chunk will contain a page anchor at the top like: [page=1] [section=Intro]\n\n...
     """
-    logger.info("Starting ingestion for %s (course=%s)", path, course_id)
+    chunks: List[Dict] = []
 
-    if not os.path.exists(path):
-        raise FileNotFoundError(path)
+    for page_idx, page_text in enumerate(pages, start=1):
+        if not page_text:
+            continue
+        lines = page_text.splitlines()
+        current_section = ""  # human-readable
+        buffer_lines: List[str] = []
 
-    with open(path, "rb") as fh:
-        pdf_bytes = fh.read()
+        def flush_section():
+            nonlocal buffer_lines, current_section
+            if not buffer_lines:
+                return
+            content = "\n".join(buffer_lines).strip()
+            if not content:
+                buffer_lines = []
+                return
+            section_key = current_section or ""  # keep empty if none
+            anchor = f"page:{page_idx}#section:{_slugify(section_key) or 'none'}"
+            text = f"[page={page_idx}] [section={section_key}] [anchor={anchor}]\n\n{content}"
+            meta = {"page": page_idx, "section": section_key}
+            if course_id:
+                meta["course_id"] = course_id
+            chunks.append({"text": text, "metadata": meta})
+            buffer_lines = []
 
-    text = parse_pdf_bytes(pdf_bytes, use_textract=use_textract)
-    if not text:
-        logger.warning("No text extracted from PDF; continuing with empty text.")
+        for line in lines:
+            if _is_heading(line):
+                # treat heading as flush point (start a new section)
+                # flush any buffered content as belonging to previous section
+                flush_section()
+                current_section = line.strip()
+                continue
 
-    chunks = semantic_chunk_text(text, max_tokens=500, overlap_tokens=50)
-    logger.info("Produced %d chunks", len(chunks))
+            # otherwise append line to buffer and flush if too large
+            buffer_lines.append(line)
+            if sum(len(l) for l in buffer_lines) > max_chars:
+                flush_section()
+        # end lines loop
+        flush_section()
 
-    bedrock = BedrockEmbeddingClientStub()
-    embeddings = bedrock.embed_texts([c.text for c in chunks])
+    return chunks
 
-    indexer = OpenSearchIndexerStub()
-    index_name = f"ragedu-docs-{course_id or 'global'}"
-    indexer.index_chunks(index_name, chunks, embeddings, course_id=course_id)
 
-    summary = {
-        "path": path,
-        "course_id": course_id,
-        "num_chunks": len(chunks),
-        "indexed_docs": len(indexer.indexed),
-        "index_name": index_name,
+# -----------------------------
+# Embeddings interface
+# -----------------------------
+
+
+class EmbeddingsInterface:
+    def embed(self, texts: List[str]) -> List[List[float]]:
+        raise NotImplementedError()
+
+
+class StubEmbeddings(EmbeddingsInterface):
+    """Deterministic stub embeddings for CI/local tests.
+
+    Produces low-dimensional vectors (default dim=8) derived from an md5
+    hash of the text so results are repeatable across runs.
+    """
+
+    def __init__(self, dims: int = 8):
+        self.dims = dims
+
+    def embed(self, texts: List[str]) -> List[List[float]]:
+        out: List[List[float]] = []
+        for t in texts:
+            h = hashlib.md5(t.encode("utf-8")).digest()
+            vec: List[float] = []
+            # expand bytes into dims floats in [-1,1]
+            i = 0
+            while len(vec) < self.dims:
+                b = h[i % len(h)]
+                val = (b / 255.0) * 2.0 - 1.0
+                vec.append(round(val, 6))
+                i += 1
+            out.append(vec[: self.dims])
+        return out
+
+
+class BedrockEmbeddings(EmbeddingsInterface):
+    """Skeleton for a Bedrock/Titan embeddings client.
+
+    This is intentionally a placeholder. A full implementation would call
+    Amazon Bedrock runtime/embeddings API and return float vectors.
+    """
+
+    def __init__(self, model: Optional[str] = None):
+        # model could be configured via env var in real wiring
+        self.model = model or os.environ.get("BACKEND_BEDROCK_MODEL")
+        # Delay boto3 import until used to avoid hard dependency at import time
+        try:
+            import boto3  # type: ignore
+
+            self._boto3 = boto3
+        except Exception:
+            self._boto3 = None
+            logger.warning("boto3 not available; BedrockEmbeddings will not work")
+
+    def embed(self, texts: List[str]) -> List[List[float]]:
+        raise NotImplementedError(
+            "BedrockEmbeddings is a scaffold placeholder. Implement calling Bedrock runtime here."
+        )
+
+
+def get_embeddings_provider() -> EmbeddingsInterface:
+    provider = os.environ.get("BACKEND_EMBEDDINGS_PROVIDER", "stub").lower()
+    if provider == "bedrock":
+        return BedrockEmbeddings()
+    # default
+    return StubEmbeddings()
+
+
+# -----------------------------
+# OpenSearch index bootstrap
+# -----------------------------
+
+
+def create_opensearch_index(host: str, index_name: str = "rage-docs", dim: int = 8) -> Dict:
+    """Create an OpenSearch index with a vector field and our metadata.
+
+    This function imports opensearchpy at runtime so the package is optional for
+    environments that don't need it. It will raise ImportError if opensearchpy
+    is not installed.
+    """
+    try:
+        from opensearchpy import OpenSearch  # type: ignore
+    except Exception as e:
+        logger.exception("opensearchpy not available: %s", e)
+        raise
+
+    client = OpenSearch(hosts=[host])
+    mapping = {
+        "mappings": {
+            "properties": {
+                "vector": {"type": "dense_vector", "dims": dim},
+                "course_id": {"type": "keyword"},
+                "page": {"type": "integer"},
+                "section": {"type": "keyword"},
+            }
+        }
     }
 
-    logger.info("Ingestion summary: %s", json.dumps(summary))
-    return summary
+    if client.indices.exists(index=index_name):
+        logger.info("Index %s already exists", index_name)
+        return mapping
+
+    logger.info("Creating OpenSearch index %s on %s", index_name, host)
+    client.indices.create(index=index_name, body=mapping)
+    return mapping
 
 
-# -------------------------
-# CLI entrypoint
-# -------------------------
+def index_documents_to_opensearch(host: str, index_name: str, docs: List[Dict], vectors: List[List[float]]):
+    try:
+        from opensearchpy import OpenSearch  # type: ignore
+    except Exception as e:
+        logger.exception("opensearchpy not available: %s", e)
+        raise
+
+    client = OpenSearch(hosts=[host])
+    # build bulk payload
+    bulk_lines: List[str] = []
+    for doc, vec in zip(docs, vectors):
+        meta = {"index": {"_index": index_name}}
+        payload = {
+            "text": doc["text"],
+            "vector": vec,
+            **doc["metadata"],
+        }
+        bulk_lines.append(_json_dumps(meta))
+        bulk_lines.append(_json_dumps(payload))
+
+    body = "\n".join(bulk_lines) + "\n"
+    client.bulk(body=body)
+
+
+def _json_dumps(o: object) -> str:
+    # delayed import to minimize top-level deps
+    import json
+
+    return json.dumps(o)
+
+
+# -----------------------------
+# CLI
+# -----------------------------
+
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m app.ingest", description="Ingest a PDF into the RAGEdu vector index (scaffold)")
-    parser.add_argument("path", help="Path to the PDF file to ingest")
-    parser.add_argument("--course", dest="course", default=None, help="Optional course id to associate with this document")
-    parser.add_argument("--use-textract", dest="use_textract", action="store_true", help="(Stub) Use Textract for parsing when available")
-
+    parser = argparse.ArgumentParser("ingest")
+    parser.add_argument("file", help="PDF file to ingest")
+    parser.add_argument("--course", help="optional course id to attach as metadata", default=None)
+    parser.add_argument("--index", help="OpenSearch index name", default="rage-docs")
+    parser.add_argument("--use-textract", action="store_true", help="Use Textract (stub) instead of pypdf")
+    parser.add_argument("--max-chars", type=int, default=1000, help="Max chars per chunk")
     args = parser.parse_args(argv)
 
-    try:
-        summary = ingest_file(args.path, course_id=args.course, use_textract=args.use_textract)
-        print(json.dumps(summary, indent=2))
+    pages = parse_pdf(args.file, use_textract=args.use_textract)
+    if not pages:
+        logger.warning("No pages parsed from %s; exiting", args.file)
+        return 1
+
+    chunks = chunk_pages(pages, course_id=args.course, max_chars=args.max_chars)
+    if not chunks:
+        logger.warning("No chunks generated from %s; exiting", args.file)
+        return 1
+
+    embed_provider = get_embeddings_provider()
+    texts = [c["text"] for c in chunks]
+    vectors = embed_provider.embed(texts)
+
+    os_host = os.environ.get("BACKEND_OS_HOST")
+    if not os_host:
+        logger.info(
+            "BACKEND_OS_HOST not configured; skipping OpenSearch indexing. Generated %d chunks.\nUse BACKEND_OS_HOST to enable indexing.",
+            len(chunks),
+        )
+        # For local convenience write a small summary
+        for i, c in enumerate(chunks[:5], start=1):
+            logger.info("Chunk %d meta=%s text_preview=%s", i, c["metadata"], c["text"][:120].replace("\n", " "))
         return 0
-    except Exception as e:
-        logger.exception("Ingestion failed: %s", e)
-        print({"error": str(e)})
-        return 2
+
+    # bootstrap index and index docs
+    create_opensearch_index(os_host, index_name=args.index, dim=len(vectors[0]) if vectors else 8)
+    index_documents_to_opensearch(os_host, args.index, chunks, vectors)
+    logger.info("Ingestion complete: indexed %d chunks to %s/%s", len(chunks), os_host, args.index)
+    return 0
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     raise SystemExit(main())
