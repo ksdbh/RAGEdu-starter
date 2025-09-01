@@ -15,27 +15,34 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Fetch recent logs (optional)
+        shell: bash
         run: |
           mkdir -p logs
           echo "[]" > logs/sentry.json
 
       - name: Analyze logs with OpenAI
+        shell: bash
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          node - <<'NODE'
+          cat > analyze.mjs <<'NODE'
           import fs from 'fs';
           import OpenAI from 'openai';
+
           const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-          const logs = fs.existsSync('logs/sentry.json') ? fs.readFileSync('logs/sentry.json','utf8') : '[]';
+          const logs = fs.existsSync('logs/sentry.json')
+            ? fs.readFileSync('logs/sentry.json','utf8')
+            : '[]';
+
           const prompt = `You are an SRE assistant. Analyze the JSON logs below:
-- Cluster similar errors
-- Suggest likely root causes
-- Propose concrete fixes
-Return Markdown only.
-Logs:
-${logs.slice(0,180000)}`;
+          - Cluster similar errors
+          - Suggest likely root causes
+          - Propose concrete fixes
+          Return Markdown only.
+          Logs:
+          ${logs.slice(0,180000)}`;
+
           const resp = await openai.chat.completions.create({
             model: "gpt-5-thinking",
             temperature: 0,
@@ -44,9 +51,12 @@ ${logs.slice(0,180000)}`;
               { role: "user", content: prompt }
             ]
           });
+
           fs.writeFileSync('triage.md', resp.choices[0].message.content, 'utf8');
           console.log('Wrote triage.md');
           NODE
+
+          node analyze.mjs
 
       - name: Create/Update issue
         uses: peter-evans/create-issue-from-file@v5
