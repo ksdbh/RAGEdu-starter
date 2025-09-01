@@ -66,13 +66,12 @@ ${snapshot}
 `;
 
   const resp = await openai.chat.completions.create({
-    model: "gpt-5-mini",
-    temperature: 0.2,
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user }
-    ],
-    response_format: { type: "json_object" }
+  model: "gpt-5-mini",
+  messages: [
+    { role: "system", content: system },
+    { role: "user", content: user }
+  ],
+  response_format: { type: "json_object" }
   });
 
   let plan;
