@@ -1,5 +1,3 @@
-/gen Replace frontend/Dockerfile with:
-
 FROM node:20-alpine
 WORKDIR /app
 
