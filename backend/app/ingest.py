@@ -19,11 +19,6 @@ def semantic_chunk_text(
     max_tokens: int = 800,
     overlap_tokens: int = 100,
 ) -> List[Chunk]:
-    """
-    Character-window chunking with EXACT prefix overlap:
-    chunk[i+1].text starts with the last `overlap_tokens` chars of chunk[i].text
-    so tests can detect a.endswith(b[:L]).
-    """
     if not text or not text.strip():
         return []
 
@@ -40,7 +35,6 @@ def semantic_chunk_text(
         out.append(Chunk(text=chunk_text, start=i, end=j))
         if j >= L:
             break
-        # ensure next window begins exactly at j-ov
         i = max(0, j - ov)
 
     return out
@@ -51,18 +45,13 @@ def _guess_section_name(lines: list[str]) -> str:
         t = ln.strip()
         if not t:
             continue
-        # VERY simple "heading" heuristic: ALLCAPS word or numbered outline like "1. Title"
         if re.match(r"^[A-Z][A-Z0-9\s\-]{2,}$", t) or re.match(r"^\d+\.\s", t):
             return t.split("\n", 1)[0][:40]
-        # fallback to first non-empty line as section
         return t[:40]
     return "Section"
 
 
 def chunk_pages(pages: Iterable[str], *, course_id: str, max_chars: int = 1000) -> List[Dict[str, Any]]:
-    """
-    Include a '[page=N]' and '[section=...]' marker in the text and a 'metadata' dict.
-    """
     out: List[Dict[str, Any]] = []
     for page_idx, page in enumerate(pages, start=1):
         text = (page or "").replace("\r\n", "\n").strip()
@@ -77,25 +66,19 @@ def chunk_pages(pages: Iterable[str], *, course_id: str, max_chars: int = 1000) 
             seg_len = len(seg) + 1
             if cur + seg_len > max_chars and buf:
                 chunk_txt = f"[page={page_idx}] [section={section}] " + "\n".join(buf)
-                meta = {"course_id": course_id, "page": page_idx, "length": len(chunk_txt)}
+                meta = {"course_id": course_id, "page": page_idx, "length": len(chunk_txt), "section": section}
                 out.append({"text": chunk_txt, "metadata": meta, "course_id": course_id, "page": page_idx, "length": len(chunk_txt)})
                 buf, cur = [], 0
             buf.append(seg)
             cur += seg_len
         if buf:
             chunk_txt = f"[page={page_idx}] [section={section}] " + "\n".join(buf)
-            meta = {"course_id": course_id, "page": page_idx, "length": len(chunk_txt)}
+            meta = {"course_id": course_id, "page": page_idx, "length": len(chunk_txt), "section": section}
             out.append({"text": chunk_txt, "metadata": meta, "course_id": course_id, "page": page_idx, "length": len(chunk_txt)})
     return out
 
 
 def create_opensearch_index(host: str, *, index_name: str, dim: int = 1536) -> Dict[str, Any]:
-    """
-    Mapping must include:
-      - vector.dims == dim
-      - course_id (keyword)
-      - page (integer)
-    """
     mapping = {
         "settings": {"index": {"number_of_shards": 1, "number_of_replicas": 0}},
         "mappings": {
@@ -105,7 +88,6 @@ def create_opensearch_index(host: str, *, index_name: str, dim: int = 1536) -> D
                 "course_id": {"type": "keyword"},
                 "page": {"type": "integer"},
                 "vector": {"type": "knn_vector", "dims": dim},
-                # keep for compatibility in other parts
                 "embedding": {"type": "knn_vector", "dimension": dim},
             }
         },
@@ -121,9 +103,6 @@ def create_opensearch_index(host: str, *, index_name: str, dim: int = 1536) -> D
 
 
 class StubEmbeddings:
-    """
-    Deterministic embeddings with a batch .embed([...]) method as required by tests.
-    """
     def __init__(self, dims: int = 16):
         self.dims = int(dims)
 

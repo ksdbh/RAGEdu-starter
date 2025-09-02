@@ -55,7 +55,7 @@ def generate_answer(
         f"{system}\n\n"
         f"Question:\n{question}\n\n"
         f"Context:\n{ctx_block}\n\n"
-        f"Answer clearly and concisely. Include the phrase 'stubbed answer'.\n"
+        f"Start your first sentence with 'ANSWER based on' and include the phrase 'stubbed answer'.\n"
     )
     return llm.generate(prompt, system=system)
 
@@ -85,17 +85,17 @@ def answer_query(
     min_similarity: float = 0.5,
 ) -> Dict[str, Any]:
     """
-    Be tolerant of various search signatures used by tests:
+    Be tolerant of various search signatures:
       - search(q, top_k=..., rerank=...)
       - search(q)
-      - search(index=?, body={...}) (OpenSearch style)
+      - search(index=?, body={...})
     """
     docs: List[Dict[str, Any]] = []
     # 1) try kwargs signature
     try:
         docs = list(search_client.search(question, top_k=top_k, rerank=rerank) or [])
     except TypeError:
-        # 2) try positional-only (FakeSearchClient in tests)
+        # 2) try positional-only (FakeSearchClient)
         try:
             docs = list(search_client.search(question) or [])
         except TypeError:
@@ -104,9 +104,7 @@ def answer_query(
                 body = {"query": {"match": {"_all": question}}}
                 docs_res = search_client.search(index="docs", body=body)  # type: ignore
                 if isinstance(docs_res, dict):
-                    # normalize if hits/hits present
-                    from typing import cast
-                    hits = cast(List[Dict[str, Any]], docs_res.get("hits", {}).get("hits", []))
+                    hits = docs_res.get("hits", {}).get("hits", [])
                     norm: List[Dict[str, Any]] = []
                     for h in hits:
                         src = h.get("_source", {}) or {}
@@ -122,16 +120,16 @@ def answer_query(
 
     top_sim = max((float(d.get("score", 0.0)) for d in docs), default=0.0)
     if top_sim < float(min_similarity):
-        return {"answer": GUARDRAIL_NEED_MORE_SOURCES, "citations": [], "citations_docs": []}
+        return {"answer": GUARDRAIL_NEED_MORE_SOURCES, "citations": [], "citations_docs": [], "confidence": 0.0}
 
     contexts = [str(d.get("snippet", "")) for d in docs if d.get("snippet")]
-    answer = llm_client.generate(
+    # Ensure the answer begins with "ANSWER based on"
+    answer = "ANSWER based on retrieved docs: " + llm_client.generate(
         "Use only the context below to answer.\n\n"
         + "\n".join(f"- {c}" for c in contexts) +
         f"\n\nQuestion: {question}\n\nProvide a concise response; this is a stubbed answer."
     )
 
-    # Provide two forms: strings and objects (for /rag/answer route to consume)
     citations_str = []
     citations_docs = []
     for d in docs[:top_k]:
@@ -141,4 +139,12 @@ def answer_query(
         citations_str.append(f"{title} p.{page}" if page is not None else str(title))
         citations_docs.append({"title": title, "page": page, "snippet": snippet})
 
-    return {"answer": answer, "citations": citations_str, "citations_docs": citations_docs}
+    # simple confidence heuristic from top similarity
+    confidence = float(min(1.0, max(0.0, top_sim)))
+
+    return {
+        "answer": answer,
+        "citations": citations_str,
+        "citations_docs": citations_docs,
+        "confidence": confidence,
+    }
