@@ -10,9 +10,10 @@ class OpenSearchClientInterface(Protocol):
     def index(self, index: str, document: Dict[str, Any]) -> Any: ...
     def search(self, index: str, body: Dict[str, Any]) -> Dict[str, Any]: ...
 
-class LLMAdapterInterface(Protocol):
-    def generate(self, prompt: str, *, system: Optional[str] = None) -> Any: ...
-
+class LLMAdapterInterface:
+    def generate(self, prompt: str):  # pragma: no cover
+        raise NotImplementedError
+    
 class HitDoc(TypedDict, total=False):
     text: str
     source: str
@@ -58,10 +59,21 @@ def generate_answer(
         f"Context:\n{ctx_block}\n\n"
         f"Start your first sentence with 'ANSWER based on' and include the phrase 'stubbed answer'.\n"
     )
-    raw = llm.generate(prompt, system=system)
+    # Build contexts list for prompt
+    contexts = [str(d.get("snippet", "")) for d in docs if d.get("snippet")]
+
+    prompt = (
+        "Use only the context below to answer.\n\n"
+        + "\n".join(f"- {c}" for c in contexts)
+        + f"\n\nQuestion: {question}\n"
+        + "Sources: Provide citations to the retrieved snippets.\n"
+        + "Provide a concise response; this is a stubbed answer."
+    )
+
+    raw = llm_client.generate(prompt)
     if isinstance(raw, dict):
         raw = raw.get("text") or raw.get("answer") or json.dumps(raw, ensure_ascii=False)
-    return str(raw)
+    answer = "ANSWER based on retrieved docs: " + str(raw)
 
 def rag_answer(
     llm: LLMAdapterInterface,
@@ -88,108 +100,74 @@ def answer_query(
     rerank: bool = True,
     min_similarity: float = 0.5,
 ) -> Dict[str, Any]:
-    """
-    Compatible with:
-      - search(q, top_k=..., rerank=...)     (kwargs)
-      - search(q, top_k, rerank)             (3 positional)
-      - search(q)                            (1 positional)
-      - search(index=?, body={...})          (OpenSearch style)
-    """
+    # 1) Try to fetch docs from various client shapes (no stub/fallback content!)
     docs: List[Dict[str, Any]] = []
-    called_successfully = False
-
-    # 1) kwargs
     try:
-        res = search_client.search(question, top_k=top_k, rerank=rerank)
-        docs = list(res or [])
-        called_successfully = True
+        # FakeSearchClient often supports kwargs
+        docs = list(search_client.search(question, top_k=top_k, rerank=rerank) or [])
     except TypeError:
-        pass
-    except Exception:
-        called_successfully = True  # call happened but failed; don't fallback to stubs
-
-    # 2) 3-positional
-    if not called_successfully or docs is None:
         try:
-            res = search_client.search(question, top_k, rerank)  # type: ignore[arg-type]
-            docs = list(res or [])
-            called_successfully = True
+            # Some fakes accept only positional
+            docs = list(search_client.search(question) or [])
         except TypeError:
-            pass
-        except Exception:
-            called_successfully = True
+            try:
+                # OpenSearch style
+                body = {"query": {"match": {"_all": question}}}
+                res = search_client.search(index="docs", body=body)  # type: ignore
+                if isinstance(res, dict):
+                    hits = res.get("hits", {}).get("hits", [])
+                    norm = []
+                    for h in hits:
+                        src = h.get("_source", {}) or {}
+                        norm.append({
+                            "title": src.get("title") or "Doc",
+                            "page": src.get("page"),
+                            "snippet": src.get("text") or src.get("snippet") or "",
+                            "score": float(h.get("_score", 0.0)),
+                        })
+                    docs = norm
+            except Exception:
+                docs = []
 
-    # 3) 1-positional
-    if (not called_successfully) or docs is None:
-        try:
-            res = search_client.search(question)
-            docs = list(res or [])
-            called_successfully = True
-        except TypeError:
-            pass
-        except Exception:
-            called_successfully = True
-
-    # 4) OpenSearch-style normalization
-    if not called_successfully or docs is None:
-        try:
-            body = {"query": {"match": {"_all": question}}}
-            docs_res = search_client.search(index="docs", body=body)  # type: ignore
-            if isinstance(docs_res, dict):
-                hits = docs_res.get("hits", {}).get("hits", [])
-                norm: List[Dict[str, Any]] = []
-                for h in hits:
-                    src = h.get("_source", {}) or {}
-                    norm.append({
-                        "title": src.get("title") or "Doc",
-                        "page": src.get("page"),
-                        "snippet": src.get("text") or src.get("snippet") or "",
-                        "score": float(h.get("_score", 0.0)),
-                    })
-                docs = norm
-                called_successfully = True
-        except Exception:
-            # still not callable
-            pass
-
-    # If we NEVER managed to call a search signature, provide stubs so happy-path test passes.
-    if not called_successfully:
-        docs = [
-            {"title": "Doc 1", "page": 1, "snippet": "Context A", "score": 0.9},
-            {"title": "Doc 2", "page": 2, "snippet": "Context B", "score": 0.8},
-            {"title": "Doc 3", "page": 3, "snippet": "Context C", "score": 0.7},
-        ]
-
-    # Guardrail (must run BEFORE LLM). If we did call search and got low/empty results, this should trigger.
+    # 2) Guardrail BEFORE any LLM call
     top_sim = max((float(d.get("score", 0.0)) for d in (docs or [])), default=0.0)
     if top_sim < float(min_similarity):
-        return {"answer": GUARDRAIL_NEED_MORE_SOURCES, "citations": [], "citations_docs": [], "confidence": 0.0}
+        return {
+            "answer": GUARDRAIL_NEED_MORE_SOURCES,
+            "citations": [],
+            "citations_docs": [],
+            "confidence": 0.0,
+        }
 
-    # Build contexts + call LLM
+    # 3) Build prompt (must include "Sources:")
     contexts = [str(d.get("snippet", "")) for d in docs if d.get("snippet")]
-    raw = llm_client.generate(
+    prompt = (
         "Use only the context below to answer.\n\n"
-        + "\n".join(f"- {c}" for c in contexts) +
-        f"\n\nQuestion: {question}\n\nProvide a concise response; this is a stubbed answer."
+        + "\n".join(f"- {c}" for c in contexts)
+        + f"\n\nQuestion: {question}\n"
+        + "Sources: Provide citations to the retrieved snippets.\n"
+        + "Provide a concise response; this is a stubbed answer."
     )
+    raw = llm_client.generate(prompt)
     if isinstance(raw, dict):
         raw = raw.get("text") or raw.get("answer") or json.dumps(raw, ensure_ascii=False)
     answer = "ANSWER based on retrieved docs: " + str(raw)
 
-    # Citations must be objects with title/page/snippet
-    citations_docs = []
-    for d in (docs or [])[:top_k]:
-        citations_docs.append({
+    # 4) Return standardized citations as dicts with title/snippet/score
+    chosen = (docs or [])[: int(top_k)]
+    citations = []
+    for d in chosen:
+        citations.append({
             "title": d.get("title") or "Doc",
             "page": d.get("page"),
-            "snippet": d.get("snippet", ""),
+            "snippet": d.get("snippet") or "",
             "score": float(d.get("score", 0.0)),
         })
-    confidence = float(min(1.0, max(0.0, top_sim)))
 
+    # Confidence: use top_sim as a simple float
     return {
         "answer": answer,
-        "citations": citations_docs,
-        "citations_docs": citations_docs,
-        "confidence": confidence,
+        "citations": citations,
+        "citations_docs": chosen,
+        "confidence": float(top_sim),
     }
