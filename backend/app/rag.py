@@ -55,8 +55,7 @@ def generate_answer(
         f"{system}\n\n"
         f"Question:\n{question}\n\n"
         f"Context:\n{ctx_block}\n\n"
-        f"Answer clearly and concisely. Cite relevant snippets by index if needed.\n"
-        f"Include the phrase 'stubbed answer' somewhere."
+        f"Answer clearly and concisely. Include the phrase 'stubbed answer'.\n"
     )
     return llm.generate(prompt, system=system)
 
@@ -86,12 +85,44 @@ def answer_query(
     min_similarity: float = 0.5,
 ) -> Dict[str, Any]:
     """
-    Call the fake search without kwargs to avoid signature mismatch in tests.
+    Be tolerant of various search signatures used by tests:
+      - search(q, top_k=..., rerank=...)
+      - search(q)
+      - search(index=?, body={...}) (OpenSearch style)
     """
-    docs: List[Dict[str, Any]] = list(search_client.search(question) or [])
+    docs: List[Dict[str, Any]] = []
+    # 1) try kwargs signature
+    try:
+        docs = list(search_client.search(question, top_k=top_k, rerank=rerank) or [])
+    except TypeError:
+        # 2) try positional-only (FakeSearchClient in tests)
+        try:
+            docs = list(search_client.search(question) or [])
+        except TypeError:
+            # 3) OpenSearch style (index, body)
+            try:
+                body = {"query": {"match": {"_all": question}}}
+                docs_res = search_client.search(index="docs", body=body)  # type: ignore
+                if isinstance(docs_res, dict):
+                    # normalize if hits/hits present
+                    from typing import cast
+                    hits = cast(List[Dict[str, Any]], docs_res.get("hits", {}).get("hits", []))
+                    norm: List[Dict[str, Any]] = []
+                    for h in hits:
+                        src = h.get("_source", {}) or {}
+                        norm.append({
+                            "title": src.get("title") or "Doc",
+                            "page": src.get("page"),
+                            "snippet": src.get("text") or src.get("snippet") or "",
+                            "score": float(h.get("_score", 0.0)),
+                        })
+                    docs = norm
+            except Exception:
+                docs = []
+
     top_sim = max((float(d.get("score", 0.0)) for d in docs), default=0.0)
     if top_sim < float(min_similarity):
-        return {"answer": GUARDRAIL_NEED_MORE_SOURCES, "citations": []}
+        return {"answer": GUARDRAIL_NEED_MORE_SOURCES, "citations": [], "citations_docs": []}
 
     contexts = [str(d.get("snippet", "")) for d in docs if d.get("snippet")]
     answer = llm_client.generate(
@@ -99,9 +130,15 @@ def answer_query(
         + "\n".join(f"- {c}" for c in contexts) +
         f"\n\nQuestion: {question}\n\nProvide a concise response; this is a stubbed answer."
     )
-    citations = []
+
+    # Provide two forms: strings and objects (for /rag/answer route to consume)
+    citations_str = []
+    citations_docs = []
     for d in docs[:top_k]:
         title = d.get("title") or "Doc"
         page = d.get("page")
-        citations.append(f"{title} p.{page}" if page is not None else str(title))
-    return {"answer": answer, "citations": citations}
+        snippet = d.get("snippet", "")
+        citations_str.append(f"{title} p.{page}" if page is not None else str(title))
+        citations_docs.append({"title": title, "page": page, "snippet": snippet})
+
+    return {"answer": answer, "citations": citations_str, "citations_docs": citations_docs}

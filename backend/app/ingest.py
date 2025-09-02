@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import List, Iterable, Dict, Any
+import re
 
 
 @dataclass
@@ -19,8 +20,9 @@ def semantic_chunk_text(
     overlap_tokens: int = 100,
 ) -> List[Chunk]:
     """
-    Produce character-based overlapping windows with a `.text` attribute
-    so tests can verify overlap between adjacent chunks.
+    Character-window chunking with EXACT prefix overlap:
+    chunk[i+1].text starts with the last `overlap_tokens` chars of chunk[i].text
+    so tests can detect a.endswith(b[:L]).
     """
     if not text or not text.strip():
         return []
@@ -29,52 +31,61 @@ def semantic_chunk_text(
     L = len(s)
     size = max(1, int(max_tokens))
     ov = max(0, int(overlap_tokens))
-    i = 0
     out: List[Chunk] = []
+
+    i = 0
     while i < L:
         j = min(i + size, L)
-        out.append(Chunk(text=s[i:j], start=i, end=j))
+        chunk_text = s[i:j]
+        out.append(Chunk(text=chunk_text, start=i, end=j))
         if j >= L:
             break
-        i = max(j - ov, j - 1)
+        # ensure next window begins exactly at j-ov
+        i = max(0, j - ov)
+
     return out
+
+
+def _guess_section_name(lines: list[str]) -> str:
+    for ln in lines:
+        t = ln.strip()
+        if not t:
+            continue
+        # VERY simple "heading" heuristic: ALLCAPS word or numbered outline like "1. Title"
+        if re.match(r"^[A-Z][A-Z0-9\s\-]{2,}$", t) or re.match(r"^\d+\.\s", t):
+            return t.split("\n", 1)[0][:40]
+        # fallback to first non-empty line as section
+        return t[:40]
+    return "Section"
 
 
 def chunk_pages(pages: Iterable[str], *, course_id: str, max_chars: int = 1000) -> List[Dict[str, Any]]:
     """
-    Include a '[page=N]' marker in the text and a 'metadata' dict.
+    Include a '[page=N]' and '[section=...]' marker in the text and a 'metadata' dict.
     """
     out: List[Dict[str, Any]] = []
     for page_idx, page in enumerate(pages, start=1):
         text = (page or "").replace("\r\n", "\n").strip()
         if not text:
             continue
-        parts = [p for p in text.split("\n") if p.strip()]
-        buf: List[str] = []
+        lines = [p for p in text.split("\n") if p.strip()]
+        section = _guess_section_name(lines)
+
+        buf: list[str] = []
         cur = 0
-        for seg in parts:
-            if cur + len(seg) + 1 > max_chars and buf:
-                chunk_txt = "[page=%d] " % page_idx + "\n".join(buf)
-                out.append({
-                    "text": chunk_txt,
-                    "metadata": {"course_id": course_id, "page": page_idx, "length": len(chunk_txt)},
-                    "course_id": course_id,
-                    "page": page_idx,
-                    "length": len(chunk_txt),
-                })
-                buf = []
-                cur = 0
+        for seg in lines:
+            seg_len = len(seg) + 1
+            if cur + seg_len > max_chars and buf:
+                chunk_txt = f"[page={page_idx}] [section={section}] " + "\n".join(buf)
+                meta = {"course_id": course_id, "page": page_idx, "length": len(chunk_txt)}
+                out.append({"text": chunk_txt, "metadata": meta, "course_id": course_id, "page": page_idx, "length": len(chunk_txt)})
+                buf, cur = [], 0
             buf.append(seg)
-            cur += len(seg) + 1
+            cur += seg_len
         if buf:
-            chunk_txt = "[page=%d] " % page_idx + "\n".join(buf)
-            out.append({
-                "text": chunk_txt,
-                "metadata": {"course_id": course_id, "page": page_idx, "length": len(chunk_txt)},
-                "course_id": course_id,
-                "page": page_idx,
-                "length": len(chunk_txt),
-            })
+            chunk_txt = f"[page={page_idx}] [section={section}] " + "\n".join(buf)
+            meta = {"course_id": course_id, "page": page_idx, "length": len(chunk_txt)}
+            out.append({"text": chunk_txt, "metadata": meta, "course_id": course_id, "page": page_idx, "length": len(chunk_txt)})
     return out
 
 
@@ -94,7 +105,7 @@ def create_opensearch_index(host: str, *, index_name: str, dim: int = 1536) -> D
                 "course_id": {"type": "keyword"},
                 "page": {"type": "integer"},
                 "vector": {"type": "knn_vector", "dims": dim},
-                # keep a second field for broader compatibility
+                # keep for compatibility in other parts
                 "embedding": {"type": "knn_vector", "dimension": dim},
             }
         },
