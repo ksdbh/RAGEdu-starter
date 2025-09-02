@@ -1,0 +1,37 @@
+site_name: EduRAG Dev Docs
+site_description: Developer documentation for the EduRAG backend and assistants
+site_url: https://ksdbh.github.io/RAGEdu-starter/
+repo_url: https://github.com/ksdbh/RAGEdu-starter
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.instant
+    - navigation.sections
+    - navigation.tracking
+    - search.highlight
+    - search.suggest
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+nav:
+  - Overview: index.md
+  - Architecture: architecture.md
+  - Backend:
+      - Endpoints: backend.md
+      - RAG Pipeline: rag.md
+      - Guardrails: guardrails.md
+  - Testing: testing.md
+  - Gotchas: gotchas.md
+  - For Assistants: assistant.md
+  - Operations: ops.md
+markdown_extensions:
+  - admonition
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+plugins:
+  - search
