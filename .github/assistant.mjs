@@ -6,7 +6,11 @@ import { execSync } from "node:child_process";
 
 const { context } = github;
 
-// Prefer PAT (bypasses some org restrictions) and fall back to GITHUB_TOKEN
+// before pushing
+sh(`git remote set-url origin https://x-access-token:${process.env.GH_AUTOMERGE_PAT || process.env.GITHUB_TOKEN}@github.com/${owner}/${repo}.git`);
+sh(`git push --set-upstream origin ${branch}`);
+
+// Octokit: prefer PAT, fall back to GITHUB_TOKEN
 const gh = new Octokit({ auth: process.env.GH_AUTOMERGE_PAT || process.env.GITHUB_TOKEN });
 
 // OpenAI client (expects OPENAI_API_KEY secret)
