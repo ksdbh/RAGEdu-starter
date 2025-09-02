@@ -1,0 +1,40 @@
+# Ignore python cache and build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtualenvs
+.venv/
+venv/
+env/
+.env
+
+# Git
+.git/
+.gitignore
+
+# Docker / compose
+Dockerfile
+docker-compose*.yml
+
+# Node / frontend artifacts (not needed in backend build context)
+frontend/node_modules/
+frontend/.next/
+frontend/build/
+
+# Tests / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+
+# Packaging
+build/
+dist/
+*.egg-info/
+
+# IDEs
+.vscode/
+.idea/
+
+# Logs
+*.log
