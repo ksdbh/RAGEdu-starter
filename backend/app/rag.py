@@ -97,26 +97,26 @@ def answer_query(
     docs: List[Dict[str, Any]] = []
 
     # Prefer positional signature first (many fakes use this)
-    tried = False
+    tried_any = False
     try:
         docs = list(search_client.search(question) or [])
-        tried = True
+        tried_any = True
     except TypeError:
         pass
     except Exception:
-        tried = True
+        tried_any = True
 
     if not docs:
         try:
             docs = list(search_client.search(question, top_k=top_k, rerank=rerank) or [])
-            tried = True
+            tried_any = True
         except TypeError:
             pass
         except Exception:
-            tried = True
+            tried_any = True
 
     if not docs:
-        # OpenSearch style
+        # OpenSearch-style normalization
         try:
             body = {"query": {"match": {"_all": question}}}
             docs_res = search_client.search(index="docs", body=body)  # type: ignore
@@ -132,23 +132,16 @@ def answer_query(
                         "score": float(h.get("_score", 0.0)),
                     })
                 docs = norm
+                tried_any = True
         except Exception:
             pass
 
-    # Safety fallback so that the "happy-path" test produces an answer (but
-    # ONLY if we couldn't successfully try any search API).
-    if not docs and not tried:
-        docs = [
-            {"title": "Doc 1", "page": 1, "snippet": "Context A", "score": 0.9},
-            {"title": "Doc 2", "page": 2, "snippet": "Context B", "score": 0.8},
-            {"title": "Doc 3", "page": 3, "snippet": "Context C", "score": 0.7},
-        ]
-
-    # Guardrail BEFORE calling the LLM
+    # Guardrail BEFORE any LLM call
     top_sim = max((float(d.get("score", 0.0)) for d in docs), default=0.0)
     if top_sim < float(min_similarity):
         return {"answer": GUARDRAIL_NEED_MORE_SOURCES, "citations": [], "citations_docs": [], "confidence": 0.0}
 
+    # Build contexts for LLM
     contexts = [str(d.get("snippet", "")) for d in docs if d.get("snippet")]
     raw = llm_client.generate(
         "Use only the context below to answer.\n\n"
@@ -159,20 +152,21 @@ def answer_query(
         raw = raw.get("text") or raw.get("answer") or json.dumps(raw, ensure_ascii=False)
     answer = "ANSWER based on retrieved docs: " + str(raw)
 
-    citations_str = []
+    # Citations must be objects with title/page/snippet for the tests
     citations_docs = []
     for d in docs[:top_k]:
-        title = d.get("title") or "Doc"
-        page = d.get("page")
-        snippet = d.get("snippet", "")
-        citations_str.append(f"{title} p.{page}" if page is not None else str(title))
-        citations_docs.append({"title": title, "page": page, "snippet": snippet})
+        citations_docs.append({
+            "title": d.get("title") or "Doc",
+            "page": d.get("page"),
+            "snippet": d.get("snippet", ""),
+            "score": float(d.get("score", 0.0)),
+        })
 
     confidence = float(min(1.0, max(0.0, top_sim)))
 
     return {
         "answer": answer,
-        "citations": citations_str,
+        "citations": citations_docs,   # object form expected by tests
         "citations_docs": citations_docs,
         "confidence": confidence,
     }
