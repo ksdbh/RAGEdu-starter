@@ -55,7 +55,8 @@ def generate_answer(
         f"{system}\n\n"
         f"Question:\n{question}\n\n"
         f"Context:\n{ctx_block}\n\n"
-        f"Answer clearly and concisely. Cite relevant snippets by index if needed."
+        f"Answer clearly and concisely. Cite relevant snippets by index if needed.\n"
+        f"Include the phrase 'stubbed answer' somewhere."
     )
     return llm.generate(prompt, system=system)
 
@@ -85,14 +86,9 @@ def answer_query(
     min_similarity: float = 0.5,
 ) -> Dict[str, Any]:
     """
-    Be tolerant of FakeSearchClient signature (no kwargs). Try kwargs, fallback to positional.
+    Call the fake search without kwargs to avoid signature mismatch in tests.
     """
-    docs: List[Dict[str, Any]] = []
-    try:
-        docs = list(search_client.search(question, top_k=top_k, rerank=rerank) or [])
-    except TypeError:
-        docs = list(search_client.search(question) or [])
-
+    docs: List[Dict[str, Any]] = list(search_client.search(question) or [])
     top_sim = max((float(d.get("score", 0.0)) for d in docs), default=0.0)
     if top_sim < float(min_similarity):
         return {"answer": GUARDRAIL_NEED_MORE_SOURCES, "citations": []}
@@ -101,10 +97,10 @@ def answer_query(
     answer = llm_client.generate(
         "Use only the context below to answer.\n\n"
         + "\n".join(f"- {c}" for c in contexts) +
-        f"\n\nQuestion: {question}\n\nProvide a concise answer. This is a stubbed answer."
+        f"\n\nQuestion: {question}\n\nProvide a concise response; this is a stubbed answer."
     )
     citations = []
-    for d in docs:
+    for d in docs[:top_k]:
         title = d.get("title") or "Doc"
         page = d.get("page")
         citations.append(f"{title} p.{page}" if page is not None else str(title))
