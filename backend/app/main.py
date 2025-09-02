@@ -41,8 +41,8 @@ class QuizSubmitRequest(BaseModel):
 # ---------------- Routes ----------------
 @app.get("/health")
 def health():
-    # Must be exactly this for the health test
-    return {"ok": True}
+    # exact shape required by tests that compare for equality
+    return {"status": "ok"}
 
 @app.get("/whoami")
 def whoami(user: User = Depends(get_user)):
@@ -60,9 +60,16 @@ def protected_student(user: User = Depends(get_user)):
 def protected_prof(user: User = Depends(get_user)):
     if user.role is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    # Current tests expect 200 for an authenticated request to this route.
+    # must be professor; a plain token maps to 'student' in these tests -> 403
+    if user.role != "professor":
+        raise HTTPException(status_code=403, detail="Forbidden")
     return {"ok": True, "role": "professor", "message": "professor endpoint: authenticated"}
 
+@app.get("/protected/auth")
+def protected_auth(user: User = Depends(get_user)):
+    if user.role is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return {"ok": True, "role": user.role, "message": "authenticated"}
 # Simple “toggle” so 2nd authed call says student, 3rd says professor
 _greet_authed_calls = 0
 
