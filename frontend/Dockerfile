@@ -1,47 +1,16 @@
-# syntax=docker/dockerfile:1
+/gen Replace frontend/Dockerfile with:
 
-# ---- Builder: install deps and build the Next.js app ----
-FROM node:20-alpine AS builder
-
-# allow npm to write to /app
+FROM node:20-alpine
 WORKDIR /app
-ENV NODE_ENV=development
 
-# Copy dependency manifests first to leverage Docker layer caching
-COPY package*.json ./
+# Install dependencies
+COPY frontend/package*.json ./
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-# Install all deps (including dev deps) required for building
-RUN npm ci
-
-# Copy source and build
-COPY . .
-RUN npm run build
-
-
-# ---- Runner: lean runtime image with production deps ----
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-
-# Create non-root user for better security
-RUN addgroup -S app && adduser -S app -G app
-
-# Copy only package manifests and install production deps
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-# Copy Next build output and static assets from the builder
-COPY --from=builder /app/.next .next
-COPY --from=builder /app/public ./public
-
-# Copy any other runtime files that might be needed (e.g. start script)
-# package.json is already present; npm start should run `next start` per package scripts.
-
-# Ensure correct permissions for non-root user
-RUN chown -R app:app /app
-USER app
+# Copy rest of the app
+COPY frontend/ ./
 
 EXPOSE 3000
 
-# Run the built Next.js app. The project should define "start" (npm start) which runs `next start`.
-CMD ["npm", "start"]
+# For preview we just need it to boot; adjust later for prod
+CMD ["npm", "run", "dev"]
