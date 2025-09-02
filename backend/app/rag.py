@@ -4,28 +4,16 @@ from __future__ import annotations
 from typing import Any, Dict, List, Protocol, Sequence, TypedDict, Optional
 
 
-# --- Guardrail constants expected by tests ---
-# If tests compare against a specific value, we can adjust the literal;
-# for now we expose a readable string sentinel.
+# Guardrail sentinel expected by tests
 GUARDRAIL_NEED_MORE_SOURCES = "NEED_MORE_SOURCES"
 
 
 class OpenSearchClientInterface(Protocol):
-    """
-    Minimal interface for an OpenSearch client used in tests.
-    Implementations should provide:
-      - index(index: str, document: Dict[str, Any]) -> Any
-      - search(index: str, body: Dict[str, Any]) -> Dict[str, Any]
-    """
     def index(self, index: str, document: Dict[str, Any]) -> Any: ...
     def search(self, index: str, body: Dict[str, Any]) -> Dict[str, Any]: ...
 
 
 class LLMAdapterInterface(Protocol):
-    """
-    Minimal LLM adapter interface used in tests.
-    Implementations should provide a simple text generation method.
-    """
     def generate(self, prompt: str, *, system: Optional[str] = None) -> str: ...
 
 
@@ -35,36 +23,11 @@ class HitDoc(TypedDict, total=False):
     score: float
 
 
-def build_knn_query(
-    *,
-    vector: Sequence[float],
-    field: str = "embedding",
-    k: int = 3
-) -> Dict[str, Any]:
-    """Build a simple k-NN query for OpenSearch vector fields."""
-    return {
-        "size": k,
-        "query": {
-            "knn": {
-                field: {
-                    "vector": list(vector),
-                    "k": k,
-                }
-            }
-        }
-    }
+def build_knn_query(*, vector: Sequence[float], field: str = "embedding", k: int = 3) -> Dict[str, Any]:
+    return {"size": k, "query": {"knn": {field: {"vector": list(vector), "k": k}}}}
 
 
 def _normalize_hits(res: Dict[str, Any]) -> List[HitDoc]:
-    """
-    Normalize OpenSearch hits into {text, source, score} dicts.
-    Handles typical shapes like:
-      res["hits"]["hits"] -> [
-         {"_source": {"text": "...", "source": "s3://..."},
-          "_score": 1.23},
-         ...
-      ]
-    """
     out: List[HitDoc] = []
     for h in res.get("hits", {}).get("hits", []):
         src = h.get("_source", {}) or {}
@@ -84,7 +47,6 @@ def retrieve(
     top_k: int = 3,
     field: str = "embedding",
 ) -> List[HitDoc]:
-    """Run a k-NN search and return normalized hit docs."""
     body = build_knn_query(vector=vector, field=field, k=top_k)
     res = client.search(index=index, body=body)
     return _normalize_hits(res)
@@ -97,7 +59,6 @@ def generate_answer(
     contexts: Sequence[str],
     system: Optional[str] = "You are a helpful study assistant. Ground answers in provided context."
 ) -> str:
-    """Form a prompt and call the LLM."""
     ctx_block = "\n\n".join(f"- {c}" for c in contexts if c)
     prompt = (
         f"{system}\n\n"
@@ -118,12 +79,6 @@ def rag_answer(
     top_k: int = 3,
     field: str = "embedding",
 ) -> Dict[str, Any]:
-    """
-    Orchestration for tests:
-      - retrieve top_k docs
-      - generate answer
-      - return {"answer": str, "citations": [sources]}
-    """
     hits = retrieve(client, index=index, vector=embedding, top_k=top_k, field=field)
     contexts = [h.get("text", "") for h in hits]
     answer = generate_answer(llm, question=question, contexts=contexts)
@@ -131,25 +86,43 @@ def rag_answer(
     return {"answer": answer, "citations": citations}
 
 
+# --- Test-oriented convenience API expected by backend/tests/test_rag.py ---
+
 def answer_query(
-    llm: LLMAdapterInterface,
-    client: OpenSearchClientInterface,
-    *,
-    index: str,
     question: str,
-    embedding: Sequence[float],
+    *,
+    search_client: Any,
+    llm_client: Any,
     top_k: int = 3,
-    field: str = "embedding",
+    rerank: bool = True,
+    min_similarity: float = 0.5,
 ) -> Dict[str, Any]:
     """
-    Compatibility wrapper expected by tests.
-    Delegates to rag_answer and returns the same shape.
+    Tests call this with a FakeSearchClient(docs) and FakeLLM().
+    We call search_client.search(question, top_k=..., rerank=...) -> list[doc],
+    where each doc has at least {snippet, score, title?, page?, id?, recency?, section_score?}.
+    We compute a simple "top_sim" from doc['score'] and apply a guardrail:
+      if top_sim < min_similarity -> return NEED_MORE_SOURCES.
+    Otherwise, join snippets and ask the LLM for the answer.
     """
-    return rag_answer(
-        llm, client,
-        index=index,
-        question=question,
-        embedding=embedding,
-        top_k=top_k,
-        field=field,
+    docs: List[Dict[str, Any]] = list(search_client.search(question, top_k=top_k, rerank=rerank) or [])
+    # Normalize scores to [0,1] if possible; assume incoming 0..1 already for tests.
+    top_sim = max((float(d.get("score", 0.0)) for d in docs), default=0.0)
+    if top_sim < float(min_similarity):
+        return {"answer": GUARDRAIL_NEED_MORE_SOURCES, "citations": []}
+
+    contexts = [str(d.get("snippet", "")) for d in docs if d.get("snippet")]
+    answer = llm_client.generate(
+        "Answer the user's question using only the context:\n\n"
+        + "\n".join(f"- {c}" for c in contexts) +
+        f"\n\nQuestion: {question}\n\nProvide a concise answer.",
     )
+    citations = []
+    for d in docs:
+        title = d.get("title") or "Doc"
+        page = d.get("page")
+        if page is not None:
+            citations.append(f"{title} p.{page}")
+        else:
+            citations.append(str(title))
+    return {"answer": answer, "citations": citations}

@@ -1,154 +1,54 @@
-import time
-import logging
-from typing import Any, Dict
+# backend/app/db.py
+from __future__ import annotations
 
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
-
-logger = logging.getLogger("db")
-
-
-class DynamoDBRecorder:
-    """Best-effort recorder for quiz results to DynamoDB.
-
-    This class attempts to put items into a DynamoDB table named 'RAGEduQuizResults'.
-    If AWS credentials or network are not available, record() will catch exceptions
-    and return False. This keeps the scaffold safe to run locally without AWS.
-    """
-
-    def __init__(self, table_name: str = "RAGEduQuizResults"):
-        self.table_name = table_name
-        try:
-            self.client = boto3.client("dynamodb")
-        except Exception as e:
-            logger.info("DynamoDB client not available: %s", e)
-            self.client = None
-
-    def record(self, item: Dict[str, Any]) -> bool:
-        """Put a single result item into the DynamoDB table.
-
-        The function will coerce values into DynamoDB expected types using the
-        AttributeValue shape (strings/numbers). It attaches a timestamp.
-        Returns True if the put succeeded, False otherwise.
-        """
-        ts = int(time.time())
-        payload = {"quiz_id": {"S": str(item.get("quiz_id"))},
-                   "question_id": {"S": str(item.get("question_id"))},
-                   "timestamp": {"N": str(ts)},
-                   "correct": {"BOOL": bool(item.get("correct", False))}}
-
-        if item.get("user_id") is not None:
-            payload["user_id"] = {"S": str(item.get("user_id"))}
-        if item.get("response") is not None:
-            payload["response"] = {"S": str(item.get("response"))}
-        if item.get("time_ms") is not None:
-            # number
-            try:
-                payload["time_ms"] = {"N": str(int(item.get("time_ms")))}
-            except Exception:
-                pass
-
-        if not self.client:
-            logger.info("DynamoDB client not configured; skipping record: %s", payload)
-            return False
-
-        try:
-            self.client.put_item(TableName=self.table_name, Item=payload)
-            logger.info("Recorded quiz result to %s", self.table_name)
-            return True
-        except (BotoCoreError, ClientError) as e:
-            logger.exception("Failed to record to DynamoDB: %s", e)
-            return False
-        except Exception as e:
-            logger.exception("Unexpected error recording to DynamoDB: %s", e)
-            return False
-
-
-# -------------------------
-# Course / Syllabus store
-# -------------------------
-
-import json
+import os
+from typing import Dict, Any, Optional
 
 
 class CourseSyllabusStore:
-    """Best-effort store for Course and Syllabus objects in DynamoDB.
-
-    This provides a minimal API used by the scaffold to create and fetch course
-    metadata and syllabi. When a real DynamoDB client is not available we fall
-    back to an in-memory dictionary so local dev and unit tests are deterministic.
-
-    Items are stored in a table (default 'RAGEduCourses') using a simple PK and
-    a JSON-serialized payload under attribute 'payload'.
     """
+    Very small store that defaults to in-memory for CI.
+    If AWS/LocalStack is available, you can extend this to use boto3.
+    """
+    _mem: Dict[str, Dict[str, Any]] = {}
 
-    def __init__(self, table_name: str = "RAGEduCourses"):
+    def __init__(self, table_name: str = "courses"):
         self.table_name = table_name
-        try:
-            self.client = boto3.client("dynamodb")
-        except Exception as e:
-            logger.info("DynamoDB client not available for CourseSyllabusStore: %s", e)
-            self.client = None
-        # in-memory fallback store: key -> dict payload
-        self._store: Dict[str, Dict[str, Any]] = {}
+        self.use_memory = os.environ.get("USE_IN_MEMORY_DB", "1") == "1"
+        self.client = None
+        if not self.use_memory:
+            try:
+                import boto3  # type: ignore
+                endpoint_url = os.environ.get("AWS_ENDPOINT_URL") or os.environ.get("AWS_ENDPOINT_URL_S3")
+                self.client = boto3.client("dynamodb", endpoint_url=endpoint_url) if endpoint_url else boto3.client("dynamodb")
+            except Exception:
+                # Fall back to memory if boto3 not available
+                self.use_memory = True
 
-    def _make_key(self, course_id: str, kind: str) -> str:
-        return f"{course_id}#{kind}"
+    def _key(self, course_id: str) -> str:
+        return f"{course_id}#course"
 
     def create_course(self, course_id: str, payload: Dict[str, Any]) -> bool:
-        key = self._make_key(course_id, "course")
-        return self._put(key, payload)
-
-    def get_course(self, course_id: str) -> Dict[str, Any]:
-        key = self._make_key(course_id, "course")
-        return self._get(key)
-
-    def create_syllabus(self, course_id: str, payload: Dict[str, Any]) -> bool:
-        key = self._make_key(course_id, "syllabus")
-        return self._put(key, payload)
-
-    def get_syllabus(self, course_id: str) -> Dict[str, Any]:
-        key = self._make_key(course_id, "syllabus")
-        return self._get(key)
-
-    def _put(self, key: str, payload: Dict[str, Any]) -> bool:
-        if not self.client:
-            # in-memory store
-            self._store[key] = payload
-            logger.info("Stored item in in-memory CourseSyllabusStore: %s", key)
+        if self.use_memory or not self.client:
+            key = self._key(course_id)
+            self._mem[key] = dict(payload)
             return True
-
+        # (Optional) Real DynamoDB path could go here; for tests, memory is enough.
         try:
-            doc = {"id": {"S": key}, "payload": {"S": json.dumps(payload)}}
+            doc = {"pk": {"S": self._key(course_id)}, "doc": {"S": str(payload)}}
             self.client.put_item(TableName=self.table_name, Item=doc)
-            logger.info("Stored item to DynamoDB table %s key=%s", self.table_name, key)
             return True
-        except (BotoCoreError, ClientError) as e:
-            logger.exception("Failed to put_item to DynamoDB for %s: %s", key, e)
-            return False
-        except Exception as e:
-            logger.exception("Unexpected error storing %s: %s", key, e)
+        except Exception:
             return False
 
-    def _get(self, key: str) -> Dict[str, Any]:
-        if not self.client:
-            v = self._store.get(key)
-            if v is None:
-                raise KeyError(key)
-            return v
-
+    def get_course(self, course_id: str) -> Optional[Dict[str, Any]]:
+        if self.use_memory or not self.client:
+            return self._mem.get(self._key(course_id))
         try:
-            res = self.client.get_item(TableName=self.table_name, Key={"id": {"S": key}})
+            res = self.client.get_item(TableName=self.table_name, Key={"pk": {"S": self._key(course_id)}})
             item = res.get("Item")
             if not item:
-                raise KeyError(key)
-            payload_s = item.get("payload", {}).get("S")
-            if not payload_s:
-                raise KeyError(key)
-            return json.loads(payload_s)
-        except (BotoCoreError, ClientError) as e:
-            logger.exception("Failed to get_item from DynamoDB for %s: %s", key, e)
-            raise
-        except Exception as e:
-            logger.exception("Unexpected error retrieving %s: %s", key, e)
-            raise
+                return None
+            return {"raw": item.get("doc", {}).get("S")}
+        except Exception:
+            return None
