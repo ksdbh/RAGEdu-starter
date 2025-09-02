@@ -1,32 +1,24 @@
-# AWS integrations
+# AWS Integrations
 
-Lists AWS services the scaffold is designed to use and integration notes.
+This project uses (or plans to use) the following AWS services:
 
-Services used
+- S3 — document storage (PDFs/slides)
+- Textract — OCR / text extraction (optional; local parser allowed)
+- OpenSearch — vector index (or hosted OpenSearch Service)
+- Cognito — authentication / user pools
+- (Optional) Bedrock / OpenAI — LLM and embeddings
 
-- S3 — document storage (uploaded PDFs & attachments)
-- Textract — OCR & structured extraction for PDFs (optional)
-- Cognito — authentication (user pools) or use MockCognitoClient locally
-- OpenSearch — vector index & metadata search (or OpenSearch Serverless)
-- DynamoDB — lightweight recording (optional)
+Region guidance
+
+- Preferred region: us-east-1 (example). Choose a region close to your users and LLM provider availability.
 
 Integration notes
 
-- Textract: prefer asynchronous job model for large documents and use S3 for inputs/outputs.
-- OpenSearch: use knn_vector mappings or OpenSearch vector plugin. If you use OpenSearch Serverless, map dims accordingly.
-
-Terraform pointers
-
-- Look for infra/terraform files. Ensure proper lifecycle and least-privilege roles for Lambda/API Gateway.
-
-Secrets and credentials
-
-- Store Bedrock/OpenAI keys in AWS Secrets Manager or infrastructure CI secrets.
+!!! note
+    The repo contains stub implementations for many AWS integrations. Replace stubs with production clients and secure credentials.
 
 Where to edit
 
 !!! info "Where to edit"
-- Integration code: infra/ and backend/app/
-- Ingestion entrypoint: backend/app/ingest.py
-
-<!-- TODO: Add concrete Terraform module examples: owner @infra-team, path infra/ -->
+    Source: docs/aws/integrations.md
+    Code: backend/app/ingest.py, backend/app/rag.py, infra/

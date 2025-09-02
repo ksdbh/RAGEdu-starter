@@ -1,12 +1,12 @@
 # FAQ
 
-Q: Can I run this without AWS?
-A: Yes. The scaffold includes mocks and stubs (MockCognitoClient, StubEmbeddings, in-memory DB). Set USE_IN_MEMORY_DB=1.
+Q: Can I use OpenAI instead of Bedrock?
+A: Yes. Set BACKEND_LLM_PROVIDER to openai and provide OPENAI_API_KEY.
 
-Q: How do I switch to real OpenSearch or Bedrock?
-A: Provide proper AWS credentials and update the adapter implementations. See docs/aws/integrations.md and infra/.
+Q: Does this store student data?
+A: The scaffold stores minimal metadata. For production, review data handling and retention policies.
 
 Where to edit
 
 !!! info "Where to edit"
-- FAQ: docs/faq.md
+    Source: docs/faq.md

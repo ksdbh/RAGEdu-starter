@@ -1,19 +1,18 @@
 # Monitoring
 
-Key metrics to monitor
+Key signals to observe
 
-- API latency and error rates (/rag/answer, /health)
-- LLM provider latency and error rates (quota errors, 5xx)
-- OpenSearch cluster health and query latency
-- Ingestion pipeline failures (Textract job failures, S3 errors)
+- API: 5xx rate, 4xx rate, latency p95/p99
+- OpenSearch: query latency, CPU/memory, queue length
+- LLM usage: tokens consumed, errors, rate limits
 
 Dashboards & alerts
 
-- Dashboard: API errors, 95/99 latency, top failing endpoints
-- Alerts: error rate > 5% sustained for 5 minutes; OpenSearch status not green; LLM provider quota errors
+- Create dashboards for API and OpenSearch.
+- Alerts: API error spike (>= 5% 5xx over 5m), LLM errors > 5 in 5m, OpenSearch cluster red status.
 
 Where to edit
 
 !!! info "Where to edit"
-- Monitoring docs: docs/operations/monitoring.md
-- Dashboards: infra/monitoring/ or cloudwatch/ dashboards
+    Source: docs/operations/monitoring.md
+    Code: infra/monitoring (if present)

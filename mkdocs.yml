@@ -1,24 +1,16 @@
-site_name: EduRAG Docs
-site_description: Developer documentation for EduRAG — RAG scaffold for course-grounded study assistance
-site_url: https://ksdbh.github.io/RAGEdu-starter
-repo_url: https://github.com/ksdbh/RAGEdu-starter
-repo_name: ksdbh/RAGEdu-starter
-site_author: EduRAG Team
+site_name: EduRAG — Developer Docs
+site_description: EduRAG — AI study companion grounded in course content (developer docs)
+site_url: https://your-org.github.io/edurag
+repo_url: https://github.com/your-org/your-repo
 
 theme:
   name: material
   language: en
-  palette:
-    - scheme: default
-      primary: indigo
-      accent: indigo
   features:
     - navigation.instant
-    - navigation.sections
-    - navigation.top
-    - toc.integrate
-    - code.copy
-    - content.code.annotate
+    - navigation.tabs
+    - search.highlight
+    - content.code.copy
 
 markdown_extensions:
   - admonition
@@ -27,45 +19,47 @@ markdown_extensions:
       permalink: true
 
 plugins:
-  - search:
-      separator: "[\s\-]+"
-  - git-revision-date-localized:
-      enabled: true
+  - search
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Quick Start: getting-started.md
+      - Project structure: project-structure.md
+      - Environments: environments.md
+      - Deployment: deployment.md
+  - Concepts:
+      - Architecture: architecture.md
+      - RAG Overview: rag/overview.md
+      - Ingestion: rag/ingestion.md
+      - Chunking: rag/chunking.md
+      - Embeddings: rag/embeddings.md
+      - Retrieval: rag/retrieval.md
+      - Guardrails: rag/guardrails.md
+  - Tutorials:
+      - (placeholder) Create an index: changelog.md
+  - Reference:
+      - Backend endpoints: backend/endpoints.md
+      - Data models: backend/data-models.md
+      - AWS Integrations: aws/integrations.md
+      - AWS IAM guidance: aws/iam.md
+  - Operations:
+      - Runbooks: operations/runbooks.md
+      - Monitoring: operations/monitoring.md
+      - Troubleshooting: operations/troubleshooting.md
+  - Security: security.md
+  - Testing:
+      - Overview: testing/overview.md
+      - How to run tests: testing/how-to-run.md
+      - Test conventions: testing/test-conventions.md
+  - Assistant:
+      - How the assistant uses docs: assistant/how-it-uses-docs.md
+  - Troubleshooting: gotchas.md
+  - FAQ: faq.md
+  - Glossary: glossary.md
+  - Changelog: changelog.md
 
 extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/your-org/your-repo
-
-nav:
-  - Home: index.md
-  - Getting Started: getting-started.md
-  - Concepts:
-    - Architecture: architecture.md
-    - Project structure: project-structure.md
-    - RAG overview: rag/overview.md
-  - Tutorials:
-    - Ingestion: rag/ingestion.md
-    - Chunking: rag/chunking.md
-    - Embeddings: rag/embeddings.md
-    - Retrieval & QA: rag/retrieval.md
-    - Guardrails: rag/guardrails.md
-  - Reference:
-    - Backend endpoints: backend/endpoints.md
-    - Data models: backend/data-models.md
-    - AWS integrations: aws/integrations.md
-    - AWS IAM guidance: aws/iam.md
-  - Testing:
-    - Overview: testing/overview.md
-    - How to run tests: testing/how-to-run.md
-    - Test conventions: testing/test-conventions.md
-  - Operations:
-    - Runbooks: operations/runbooks.md
-    - Monitoring: operations/monitoring.md
-    - Troubleshooting: operations/troubleshooting.md
-  - Security: security.md
-  - Troubleshooting: gotchas.md
-  - Assistant: assistant/how-it-uses-docs.md
-  - FAQ: faq.md
-  - Glossary: glossary.md
-  - Changelog: changelog.md

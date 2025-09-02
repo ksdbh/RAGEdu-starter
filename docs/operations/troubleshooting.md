@@ -1,18 +1,13 @@
 # Troubleshooting
 
-Quick troubleshooting checklist
+Common issues and steps
 
-- 401s: check token and whether MockCognitoClient is active. If COGNITO_USER_POOL_ID is set, switch to real Cognito.
-- No search results: ensure documents were ingested, check index mapping and vector dims.
-- LLM timeouts: check provider and network connectivity; reduce top_k or prompt size.
-
-Logs to inspect
-
-- Backend logs (application + uvicorn)
-- OpenSearch logs
-- LLM provider logs / request traces
+- Health checks failing: inspect backend logs (uvicorn) and dependency availability (OpenSearch reachable?).
+- Auth failures: ensure COGNITO_USER_POOL_ID is set for real Cognito. For local dev, use mock tokens.
+- Slow responses: check OpenSearch query times and LLM provider throttling.
 
 Where to edit
 
 !!! info "Where to edit"
-- Troubleshooting docs: docs/operations/troubleshooting.md
+    Source: docs/operations/troubleshooting.md
+    Code: backend/app/main.py, backend/app/rag.py

@@ -1,68 +1,56 @@
-# Backend endpoints
+# Backend Endpoints — Reference
 
-This page lists key backend endpoints and their contracts.
+This reference lists the main backend HTTP endpoints and their contracts. Keep this document in sync with backend/app/main.py and backend/app/rag.py.
 
-Where to edit
+Common headers
 
-!!! info "Where to edit"
-- Source: backend/app/main.py
-- RAG orchestration: backend/app/rag.py
-- Tests: backend/tests/
+- Authorization: Bearer <token> (supports mock tokens in dev)
 
-Endpoints (summary)
+Endpoints
 
-- GET /health
-  - Purpose: basic liveness check
-  - Response: 200 OK {"status": "ok"}
-  - Where to change: backend/app/main.py
+1) GET /health
 
-- GET /whoami
-  - Purpose: return current user info (uses auth dependency)
-  - Where to change: backend/app/auth.py
+- Purpose: Health check
+- Response: 200 OK with JSON {"status": "ok"}
+- Where to change: backend/app/main.py
 
-- POST /rag/answer
-  - Purpose: answer a user query using retrieval + LLM synthesis
-  - See API Contract below
+2) GET /whoami
 
-API Contract: POST /rag/answer
+- Purpose: Return current user info (mock or real Cognito)
+- Response schema: {"sub": "string", "username": "string", "role": "string", "email": "string?"}
+- Where to change: backend/app/auth.py::get_current_user
+
+3) POST /rag/answer
+
+- Purpose: Answer a user question grounded in course materials using retrieval + LLM.
+
+API Contract: /rag/answer
 
 Request schema (JSON):
 
-```json
 {
-  "course_id": "CS101",
-  "query": "Explain the chain rule",
-  "top_k": 5,
-  "temperature": 0.0,
-  "max_tokens": 512
+  "course_id": "string",   # required — which course corpus to query
+  "question": "string",    # required — user question
+  "top_k": 5,               # optional — number of retrieved passages (default 5)
+  "max_tokens": 512         # optional — LLM generation limit
 }
-```
-
-Validation rules
-
-- course_id: required string
-- query: required string, non-empty
-- top_k: optional integer (default 5), 1 <= top_k <= 20
-- temperature: optional float between 0.0 and 1.0
 
 Response schema (JSON):
 
-```json
 {
-  "answer": "...",
+  "answer": "string",
   "sources": [
-    {"course_id": "CS101", "page": 12, "section": "Derivatives", "text": "..."}
+    {"text": "string", "page": 1, "section": "string", "score": 0.95}
   ],
-  "meta": {"model": "openai-xyz", "latency_ms": 123}
+  "llm_raw": { /* provider-specific raw response */ }
 }
-```
 
-Where to change the response generation
+Validation rules
 
-!!! info "Where to edit"
-- Module: backend/app/rag.py
-- Function: answer_query (or route handler for /rag/answer)
-- Tests: backend/tests/test_rag.py (expected test name: test_rag_answer)
+- course_id: non-empty string.
+- question: min length 3 characters.
+- top_k: integer 1..20.
+- max_tokens: integer > 0 and <= 2048 (provider-dependent).
 
 Example curl
 
@@ -70,9 +58,20 @@ Example curl
 curl -X POST http://localhost:8000/rag/answer \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer student_token" \
-  -d '{"course_id":"CS101","query":"What is gradient descent?"}'
+  -d '{"course_id":"CS101","question":"What is a RAG system?","top_k":3}'
 ```
 
-Test references
+Where to change implementation
 
-- backend/tests/test_rag.py::test_rag_answer  <!-- TODO: create/verify test file and test name -->
+!!! info "Where to edit"
+    Source: docs/backend/endpoints.md
+    Public contract: docs/backend/endpoints.md#raganswer
+    Implementation: backend/app/rag.py :: answer_query (or similar)
+    Route registration: backend/app/main.py
+    Tests: backend/tests/test_rag.py (if present)
+
+Tests
+
+- Add unit tests that assert validation rules and that the /rag/answer route calls the retrieval pipeline and returns the expected schema.
+
+<!-- TODO: If backend/app/rag.py does not exist, create a minimal implementation and tests. -->

@@ -1,26 +1,25 @@
 # Chunking
 
-This page documents the chunking strategies used by the scaffold.
+Chunking takes long text (pages) and splits into passages suitable for embedding and retrieval.
 
-Functions of interest
+Reference implementation
 
-- semantic_chunk_text(text, max_tokens=800, overlap_tokens=100)
-  - Purpose: simple sliding-window chunker for long text.
-  - Returns: List[Chunk] dataclasses with start/end offsets.
-  - Where to edit: backend/app/ingest.py
+The repository includes a chunker in backend/app/ingest.py:
 
-- chunk_pages(pages: Iterable[str], course_id: str, max_chars: int = 1000)
-  - Purpose: page-aware chunking that prefixes chunks with page/section metadata.
-  - Output: list of dicts {text, metadata, course_id, page, length}
-  - Where to edit: backend/app/ingest.py
+- semantic_chunk_text(text, max_tokens=800, overlap_tokens=100) -> List[Chunk]
+- chunk_pages(pages: Iterable[str], course_id, max_chars=1000) -> List[dict]
 
-Best practices
+These functions produce chunks with metadata fields: course_id, page, length, section.
 
-- Choose chunk size so that prompt + context fits model input limits.
-- Use overlap_tokens to preserve continuity across chunk boundaries.
+Rules & recommendations
+
+- Target chunk size: 500–1000 characters (or ~256–800 tokens depending on embedding model).
+- Overlap: 50–200 tokens to preserve context across chunk boundaries.
+- Keep explicit metadata (page number, section heading) so frontend can show citations.
 
 Where to edit
 
 !!! info "Where to edit"
-- Chunking code: backend/app/ingest.py
-- Tests: backend/tests/test_ingest.py <!-- TODO: add or update -->
+    Source: docs/rag/chunking.md
+    Implementation: backend/app/ingest.py
+    Tests: backend/tests/test_ingest.py (add if missing)

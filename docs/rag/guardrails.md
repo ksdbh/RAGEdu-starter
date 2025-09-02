@@ -1,19 +1,18 @@
-# Guardrails for RAG (safety & grounding)
+# Guardrails
 
-This page explains guardrails to keep LLM outputs safe and grounded.
+Purpose
 
-Guidelines
+Guardrails reduce hallucination and expose provenance for answers. They include:
 
-- Always include citations from retrieved chunks in the response.
-- If the top passages do not contain an answer, reply with a safe fallback like "I don't know — please consult the materials." Do not hallucinate facts.
-- Enforce token and length limits on prompts and responses.
-
-Where to implement
-
-- Implement guardrails in the QA orchestration (answer_query) to validate LLM output and attach sources.
+- Retrieval: always include citations from top-k passages.
+- Prompting: instruct LLM to cite passages verbatim and refuse to answer out-of-domain questions.
+- Post-processing: sanitize or redact PII before returning.
 
 Where to edit
 
 !!! info "Where to edit"
-- Guardrails: backend/app/rag.py -> function answer_query
-- Tests: backend/tests/test_rag_guardrails.py <!-- TODO: add tests -->
+    Source: docs/rag/guardrails.md
+    Implementation: backend/app/rag.py :: answer_query
+
+!!! note
+    If answer_query is not present, implement a function that validates inputs, retrieves passages, composes a prompt with explicit citation markers, calls the LLM client, and returns structured JSON with sources.

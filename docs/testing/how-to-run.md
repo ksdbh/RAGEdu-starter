@@ -1,27 +1,22 @@
 # How to run tests
 
-Backend unit tests (pytest)
+Backend unit tests
 
 ```bash
 cd backend
 pytest -q
-# or use Makefile
-make backend-test
 ```
 
-Running a single test file
+Common targets
 
-```bash
-cd backend
-pytest -q tests/test_rag.py::test_rag_answer
-```
+- make backend-test — convenience wrapper (calls pytest in backend/)
 
-CI notes
+CI tips
 
-- GitHub Actions workflows run pytest and build frontend artifacts. Check .github/workflows for details.
+- Tests should not rely on real AWS services. Use stubs or localstack for integration tests.
 
 Where to edit
 
 !!! info "Where to edit"
-- Test runner docs: docs/testing/how-to-run.md
-- Tests: backend/tests/
+    Source: docs/testing/how-to-run.md
+    Tests: backend/tests/

@@ -1,31 +1,25 @@
 # Ingestion
 
-This tutorial shows how to ingest a PDF or text corpus into the index.
+Ingestion pipeline responsibilities
 
-High-level steps
+1. Extract text from uploaded files (Textract or PDF parser).
+2. Normalize whitespace and line breaks.
+3. Chunk text into passages with metadata (page, section, course_id).
+4. Compute embeddings and index vectors.
 
-1. Extract text from document (Textract or local parser).
-2. Page-split and normalize newlines.
-3. Chunk pages via chunk_pages or semantic_chunk_text.
-4. Embed via embedding client and index into OpenSearch.
+Quick ingest checklist (developer)
 
-Local example (CLI)
+- Confirm source file accessible (S3 or local path).
+- Run extraction step (Textract or PDF parser). See TODOs below.
+- Use chunk_pages (backend/app/ingest.py) to build chunks.
+- Use embeddings client to encode and index.
 
-The repository exposes an ingest CLI at backend/app/ingest.py. Example:
-
-```bash
-cd backend
-python -m app.ingest path/to/file.pdf --course CS101
-```
-
-Implementation notes
-
-- The function chunk_pages(pages, course_id=...) returns a list of dicts with text and metadata.
-- The embedding client and indexer are pluggable; check backend/app/ingest.py for StubEmbeddings.
+!!! note "Local dev"
+    The project includes a local ingest CLI at backend/app/ingest.py. Use `python -m app.ingest path/to/file.pdf --course CS101` from the backend/ folder.
 
 Where to edit
 
 !!! info "Where to edit"
-- Ingest code: backend/app/ingest.py
-- Indexing: infra/ and backend/app/ingest.py
-- Tests: backend/tests/test_ingest.py <!-- TODO: add tests -->
+    Source: docs/rag/ingestion.md
+    Ingest logic: backend/app/ingest.py
+    CLI: backend/app/ingest.py

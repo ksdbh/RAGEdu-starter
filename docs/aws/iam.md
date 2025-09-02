@@ -1,25 +1,21 @@
-# IAM guidance for AWS resources
+# AWS IAM guidance
 
 Principles
 
-- Principle of least privilege: grant only the actions and resources required.
-- Separate roles for ingestion (Textract, S3) and runtime (OpenSearch, LLM).
+- Least privilege: give each runtime role only the permissions needed (S3 read/list, OpenSearch access, Cognito read groups).
+- Separate roles per environment: dev/staging/prod each have separate IAM roles and policies.
 
-Recommended roles
+Example policy snippets (high-level)
 
-| Role | Purpose | Example actions |
-|------|---------|-----------------|
-| IngestRole | Textract jobs, S3 read/write | s3:GetObject, s3:PutObject, textract:StartDocumentTextDetection, textract:GetDocumentTextDetection |
-| APIExecutionRole | API access to OpenSearch & secrets | es:ESHttpPost, es:ESHttpGet OR appropriate OpenSearch permissions; secretsmanager:GetSecretValue |
-| CI/CDRole | Terraform deploys | sts:AssumeRole, iam:PassRole (careful) |
+- S3 read-only access to specific bucket(s).
+- OpenSearch: managed access via IAM policies or VPC access depending on deployment.
+- Textract: Textract:StartDocumentTextDetection + S3 read for input/output.
 
-Policy examples
-
-!!! note "Example"
-    Provide least-privilege policies in infra/iam/*.tf. <!-- TODO: infra/iam policy skeleton: owner @infra-team -->
+!!! note
+    For OpenSearch Serverless or AWS-managed OpenSearch, follow AWS docs for access methods (IAM roles, fine-grained access, or proxy lambda).
 
 Where to edit
 
 !!! info "Where to edit"
-- IAM guidance: docs/aws/iam.md
-- Terraform IAM modules: infra/iam/
+    Source: docs/aws/iam.md
+    Infra: infra/ (Terraform IAM policy files)
