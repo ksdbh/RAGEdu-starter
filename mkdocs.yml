@@ -1,7 +1,8 @@
-site_name: EduRAG Dev Docs
-site_description: Developer documentation for the EduRAG backend and assistants
-site_url: https://ksdbh.github.io/RAGEdu-starter/
-repo_url: https://github.com/ksdbh/RAGEdu-starter
+site_name: 'EduRAG Dev Docs'
+site_description: 'Developer documentation for the EduRAG backend, RAG pipeline, and operations'
+site_url: 'https://ksdbh.github.io/RAGEdu-starter/'
+repo_url: 'https://github.com/ksdbh/RAGEdu-starter'
+
 theme:
   name: material
   features:
