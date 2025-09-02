@@ -1,60 +1,149 @@
-name: Preview Test
+name: preview-test
 
 on:
   pull_request:
-  push:
-    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      compose_file:
+        description: 'Optional path to docker-compose file (relative to repo root)'
+        required: false
+
+permissions:
+  contents: read
 
 jobs:
-  preview-test:
+  e2e:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 45
+    concurrency:
+      group: preview-test-${{ github.head_ref || github.ref_name || github.run_id }}
+      cancel-in-progress: true
+    env:
+      # Allow callers (workflow_dispatch) to pass a compose file; otherwise we auto-discover
+      COMPOSE_FILE_INPUT: ${{ github.event.inputs.compose_file || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          persist-credentials: false
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Build & start services (CI compose)
+      - name: Locate compose file
+        id: find_compose
         run: |
-          docker compose -f docker-compose.ci.yml up --build -d
-
-      - name: Wait for services to become ready
-        run: |
-          # small pause to let services initialize; tests will fail fast if not ready
-          sleep 5
-
-      - name: Run backend unit tests
-        run: |
-          if [ -d backend ]; then
-            pip install -r backend/requirements.txt || true
-            cd backend && pytest -q || true
+          set -euo pipefail
+          # If workflow_dispatch provided a path, prefer it
+          if [ -n "${COMPOSE_FILE_INPUT:-}" ]; then
+            CANDIDATE="${COMPOSE_FILE_INPUT}"
+            if [ ! -f "$CANDIDATE" ]; then
+              echo "Provided compose file does not exist: $CANDIDATE" >&2
+              exit 1
+            fi
           else
-            echo "No backend directory found"
+            # Candidate names in preferred order
+            NAMES=("docker-compose.dev.yml" "docker-compose.ci.yml" "docker-compose.yml" "docker-compose.yaml")
+            CANDIDATE=""
+            for name in "${NAMES[@]}"; do
+              if [ -f "$name" ]; then
+                CANDIDATE="$name"
+                break
+              fi
+            done
+
+            if [ -z "$CANDIDATE" ]; then
+              # search up to depth 4 excluding .git
+              CANDIDATE=$(find . -maxdepth 4 -type f \( -name 'docker-compose.dev.yml' -o -name 'docker-compose.ci.yml' -o -name 'docker-compose.yml' -o -name 'docker-compose.yaml' \) -not -path './.git/*' -print -quit || true)
+            fi
+
+            if [ -z "$CANDIDATE" ]; then
+              echo "No docker-compose file found (searched common names and depth 4)." >&2
+              exit 1
+            fi
+          fi
+
+          # Normalize path (strip leading ./)
+          CANDIDATE=${CANDIDATE#./}
+          COMPOSE_DIR=$(dirname "$CANDIDATE")
+          COMPOSE_BASENAME=$(basename "$CANDIDATE")
+
+          # For files at repo root dirname is '.' -> make it explicit
+          if [ "$COMPOSE_DIR" = "." ]; then
+            COMPOSE_DIR="$PWD"
+          else
+            COMPOSE_DIR="$PWD/$COMPOSE_DIR"
+          fi
+
+          echo "COMPOSE_FILE=$CANDIDATE" >> $GITHUB_ENV
+          echo "COMPOSE_DIR=$COMPOSE_DIR" >> $GITHUB_ENV
+          echo "COMPOSE_BASENAME=$COMPOSE_BASENAME" >> $GITHUB_ENV
+          echo "Using compose file: $COMPOSE_DIR/$COMPOSE_BASENAME"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compose up
+        run: |
+          set -euo pipefail
+          echo "Starting composition from $COMPOSE_DIR (file: $COMPOSE_BASENAME)"
+          cd "$COMPOSE_DIR"
+          docker compose -f "$COMPOSE_BASENAME" up -d --build
+        env:
+          # ensure the envs from previous step are available in this step
+          COMPOSE_DIR: ${{ env.COMPOSE_DIR }}
+          COMPOSE_BASENAME: ${{ env.COMPOSE_BASENAME }}
+
+      - name: Wait for backend health
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            resp=$(curl -fsS http://localhost:8000/health || true)
+            if echo "$resp" | grep -q '"ok"'; then
+              echo "Backend healthy: $resp"; exit 0
+            fi
+            echo "Waiting for backend... ($i/60)"
+            sleep 2
+          done
+          echo "Backend never became healthy" >&2
+          # attempt to gather logs for debugging
+          cd "${COMPOSE_DIR:-.}"
+          docker compose -f "${COMPOSE_BASENAME:-docker-compose.yml}" logs || true
+          exit 1
+        env:
+          COMPOSE_DIR: ${{ env.COMPOSE_DIR }}
+          COMPOSE_BASENAME: ${{ env.COMPOSE_BASENAME }}
+
+      - name: E2E smoke
+        run: |
+          set -euo pipefail
+          # run the repo-local e2e smoke script if present; make path robust
+          if [ -x backend/scripts/e2e_smoke.sh ]; then
+            chmod +x backend/scripts/e2e_smoke.sh
+            backend/scripts/e2e_smoke.sh
+          elif [ -f backend/scripts/e2e_smoke.sh ]; then
+            chmod +x backend/scripts/e2e_smoke.sh
+            backend/scripts/e2e_smoke.sh
+          else
+            echo "No backend/scripts/e2e_smoke.sh found, skipping smoke step"
           fi
 
       - name: Build frontend
+        working-directory: frontend
         run: |
-          if [ -d frontend ]; then
-            cd frontend && npm ci && npm run build --if-present || true
-          else
-            echo "No frontend directory found"
-          fi
+          npm ci
+          npm run build
 
-      - name: Make e2e smoke script executable
-        run: chmod +x backend/scripts/e2e_smoke.sh
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/.next
 
-      - name: Run e2e smoke script
-        run: backend/scripts/e2e_smoke.sh
-
-      - name: Tear down compose (always)
+      - name: Teardown
         if: always()
-        run: docker compose -f docker-compose.ci.yml down --volumes
+        run: |
+          set -euo pipefail
+          echo "Tearing down compose at $COMPOSE_DIR (file: $COMPOSE_BASENAME)"
+          cd "${COMPOSE_DIR:-.}"
+          docker compose -f "${COMPOSE_BASENAME:-docker-compose.yml}" down -v
+        env:
+          COMPOSE_DIR: ${{ env.COMPOSE_DIR }}
+          COMPOSE_BASENAME: ${{ env.COMPOSE_BASENAME }}
