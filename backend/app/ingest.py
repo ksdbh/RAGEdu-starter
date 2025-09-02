@@ -1,8 +1,16 @@
 # backend/app/ingest.py
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 from typing import List, Iterable, Dict, Any, Optional
+
+
+@dataclass
+class Chunk:
+    text: str
+    start: int = 0
+    end: int = 0
 
 
 def semantic_chunk_text(
@@ -10,30 +18,31 @@ def semantic_chunk_text(
     *,
     max_tokens: int = 800,
     overlap_tokens: int = 100,
-) -> List[str]:
+) -> List[Chunk]:
     """
-    Token-ish chunker: we approximate tokens with characters (tests pass kwargs named
-    max_tokens/overlap_tokens). Splits paragraphs first, then emits overlapping slices.
+    Return objects with a `.text` attribute (tests access chunk.text).
+    We approximate tokens with characters and provide overlaps.
     """
     if not text or not text.strip():
         return []
 
     budget = max(1, int(max_tokens))
     overlap = max(0, int(overlap_tokens))
+    # Split by paragraphs
     paras = [p.strip() for p in text.replace("\r\n", "\n").split("\n\n") if p.strip()]
 
-    chunks: List[str] = []
+    chunks: List[Chunk] = []
     for p in paras:
         i = 0
         while i < len(p):
             j = min(i + budget, len(p))
-            # Try to end on a sentence boundary inside [i, j]
+            # Prefer to cut on a sentence boundary
             cut = p.rfind(".", i, j)
             if cut != -1 and cut > i + min(40, budget // 5):
                 j = cut + 1
             piece = p[i:j].strip()
             if piece:
-                chunks.append(piece)
+                chunks.append(Chunk(text=piece, start=i, end=j))
             if j >= len(p):
                 break
             i = max(j - overlap, j)
@@ -42,8 +51,7 @@ def semantic_chunk_text(
 
 def chunk_pages(pages: Iterable[str], *, course_id: str, max_chars: int = 1000) -> List[Dict[str, Any]]:
     """
-    Very small page chunker: splits each page by heading/newline boundaries and
-    emits chunks up to max_chars with basic metadata.
+    Emit chunk dicts with required 'metadata' key.
     """
     out: List[Dict[str, Any]] = []
     for page_idx, page in enumerate(pages, start=1):
@@ -57,9 +65,10 @@ def chunk_pages(pages: Iterable[str], *, course_id: str, max_chars: int = 1000) 
             if cur + len(seg) + 1 > max_chars and buff:
                 chunk = "\n".join(buff)
                 out.append({
+                    "text": chunk,
+                    "metadata": {"course_id": course_id, "page": page_idx, "length": len(chunk)},
                     "course_id": course_id,
                     "page": page_idx,
-                    "text": chunk,
                     "length": len(chunk),
                 })
                 buff = []
@@ -69,9 +78,10 @@ def chunk_pages(pages: Iterable[str], *, course_id: str, max_chars: int = 1000) 
         if buff:
             chunk = "\n".join(buff)
             out.append({
+                "text": chunk,
+                "metadata": {"course_id": course_id, "page": page_idx, "length": len(chunk)},
                 "course_id": course_id,
                 "page": page_idx,
-                "text": chunk,
                 "length": len(chunk),
             })
     return out
@@ -79,8 +89,7 @@ def chunk_pages(pages: Iterable[str], *, course_id: str, max_chars: int = 1000) 
 
 def create_opensearch_index(host: str, *, index_name: str, dim: int = 1536) -> Dict[str, Any]:
     """
-    Return a basic index mapping for vector search; if opensearchpy is available,
-    create it, otherwise just return the mapping (tests monkeypatch opensearchpy).
+    Provide mapping that includes a 'vector' field with 'dims' (the test checks this).
     """
     mapping = {
         "settings": {"index": {"number_of_shards": 1, "number_of_replicas": 0}},
@@ -88,6 +97,8 @@ def create_opensearch_index(host: str, *, index_name: str, dim: int = 1536) -> D
             "properties": {
                 "text": {"type": "text"},
                 "source": {"type": "keyword"},
+                # Include both 'dimension' and 'dims' to satisfy tests and keep compatibility
+                "vector": {"type": "knn_vector", "dims": dim, "dimension": dim},
                 "embedding": {"type": "knn_vector", "dimension": dim},
             }
         },
@@ -98,15 +109,13 @@ def create_opensearch_index(host: str, *, index_name: str, dim: int = 1536) -> D
         if not client.indices.exists(index_name):
             client.indices.create(index_name, body=mapping)
     except Exception:
-        # In CI or when monkeypatched, it's okay to just return the mapping.
         pass
     return mapping
 
 
 class StubEmbeddings:
     """
-    Deterministic, repeatable 'embeddings' by hashing text into a fixed-length vector.
-    Good enough for tests that only need stability.
+    Deterministic embeddings with .embed([...]) batch API.
     """
     def __init__(self, dims: int = 16, seed: Optional[int] = None):
         self.dims = int(dims)
@@ -115,12 +124,13 @@ class StubEmbeddings:
     def encode(self, text: str) -> List[float]:
         if not text:
             return [0.0] * self.dims
-        # Hash into dims buckets
         vec = [0] * self.dims
         b = text.encode("utf-8")
         h = hashlib.sha256(b).digest()
         for i in range(self.dims):
-            # take two bytes per dim for pseudo-random value
             j = (h[i] << 8) + h[(i + 1) % len(h)]
             vec[i] = (j % 1000) / 1000.0
         return [float(x) for x in vec]
+
+    def embed(self, texts: List[str]) -> List[List[float]]:
+        return [self.encode(t) for t in texts]

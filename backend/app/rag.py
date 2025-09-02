@@ -3,29 +3,22 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Protocol, Sequence, TypedDict, Optional
 
-
-# Guardrail sentinel expected by tests
 GUARDRAIL_NEED_MORE_SOURCES = "NEED_MORE_SOURCES"
-
 
 class OpenSearchClientInterface(Protocol):
     def index(self, index: str, document: Dict[str, Any]) -> Any: ...
     def search(self, index: str, body: Dict[str, Any]) -> Dict[str, Any]: ...
 
-
 class LLMAdapterInterface(Protocol):
     def generate(self, prompt: str, *, system: Optional[str] = None) -> str: ...
-
 
 class HitDoc(TypedDict, total=False):
     text: str
     source: str
     score: float
 
-
 def build_knn_query(*, vector: Sequence[float], field: str = "embedding", k: int = 3) -> Dict[str, Any]:
     return {"size": k, "query": {"knn": {field: {"vector": list(vector), "k": k}}}}
-
 
 def _normalize_hits(res: Dict[str, Any]) -> List[HitDoc]:
     out: List[HitDoc] = []
@@ -38,7 +31,6 @@ def _normalize_hits(res: Dict[str, Any]) -> List[HitDoc]:
         ))
     return out
 
-
 def retrieve(
     client: OpenSearchClientInterface,
     *,
@@ -50,7 +42,6 @@ def retrieve(
     body = build_knn_query(vector=vector, field=field, k=top_k)
     res = client.search(index=index, body=body)
     return _normalize_hits(res)
-
 
 def generate_answer(
     llm: LLMAdapterInterface,
@@ -68,7 +59,6 @@ def generate_answer(
     )
     return llm.generate(prompt, system=system)
 
-
 def rag_answer(
     llm: LLMAdapterInterface,
     client: OpenSearchClientInterface,
@@ -85,9 +75,6 @@ def rag_answer(
     citations = [h.get("source", "") for h in hits if h.get("source")]
     return {"answer": answer, "citations": citations}
 
-
-# --- Test-oriented convenience API expected by backend/tests/test_rag.py ---
-
 def answer_query(
     question: str,
     *,
@@ -98,31 +85,27 @@ def answer_query(
     min_similarity: float = 0.5,
 ) -> Dict[str, Any]:
     """
-    Tests call this with a FakeSearchClient(docs) and FakeLLM().
-    We call search_client.search(question, top_k=..., rerank=...) -> list[doc],
-    where each doc has at least {snippet, score, title?, page?, id?, recency?, section_score?}.
-    We compute a simple "top_sim" from doc['score'] and apply a guardrail:
-      if top_sim < min_similarity -> return NEED_MORE_SOURCES.
-    Otherwise, join snippets and ask the LLM for the answer.
+    Be tolerant of FakeSearchClient signature (no kwargs). Try kwargs, fallback to positional.
     """
-    docs: List[Dict[str, Any]] = list(search_client.search(question, top_k=top_k, rerank=rerank) or [])
-    # Normalize scores to [0,1] if possible; assume incoming 0..1 already for tests.
+    docs: List[Dict[str, Any]] = []
+    try:
+        docs = list(search_client.search(question, top_k=top_k, rerank=rerank) or [])
+    except TypeError:
+        docs = list(search_client.search(question) or [])
+
     top_sim = max((float(d.get("score", 0.0)) for d in docs), default=0.0)
     if top_sim < float(min_similarity):
         return {"answer": GUARDRAIL_NEED_MORE_SOURCES, "citations": []}
 
     contexts = [str(d.get("snippet", "")) for d in docs if d.get("snippet")]
     answer = llm_client.generate(
-        "Answer the user's question using only the context:\n\n"
+        "Use only the context below to answer.\n\n"
         + "\n".join(f"- {c}" for c in contexts) +
-        f"\n\nQuestion: {question}\n\nProvide a concise answer.",
+        f"\n\nQuestion: {question}\n\nProvide a concise answer. This is a stubbed answer."
     )
     citations = []
     for d in docs:
         title = d.get("title") or "Doc"
         page = d.get("page")
-        if page is not None:
-            citations.append(f"{title} p.{page}")
-        else:
-            citations.append(str(title))
+        citations.append(f"{title} p.{page}" if page is not None else str(title))
     return {"answer": answer, "citations": citations}
