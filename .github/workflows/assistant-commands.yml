@@ -4,11 +4,17 @@ on:
   issue_comment:
     types: [created]
   workflow_dispatch:
+    inputs:
+      cmd:
+        description: "Optional command to run (e.g., /gen Add README)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
   pull-requests: write
   issues: write
+  workflows: write
 
 jobs:
   run:
@@ -21,8 +27,17 @@ jobs:
                                                    startsWith(github.event.comment.body, '/fix') ||
                                                    startsWith(github.event.comment.body, '/scaffold')))
     runs-on: ubuntu-latest
+    env:
+      # Make these available to .github/assistant.mjs
+      GH_AUTOMERGE_PAT: ${{ secrets.GH_AUTOMERGE_PAT }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DISPATCH_CMD: ${{ github.event.inputs.cmd }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # We push with PAT from the script; don't keep the default token in git config
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -35,8 +50,4 @@ jobs:
           npm i openai@4 octokit @actions/github
 
       - name: Run assistant
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GH_AUTOMERGE_PAT: ${{ secrets.GH_AUTOMERGE_PAT }}
         run: node .github/assistant.mjs

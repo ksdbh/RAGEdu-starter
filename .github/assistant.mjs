@@ -1,4 +1,4 @@
-import { Octokit } from "octokit";
+ import { Octokit } from "octokit";
 import github from "@actions/github";
 import OpenAI from "openai";
 import fs from "fs";
@@ -6,14 +6,10 @@ import { execSync } from "node:child_process";
 
 const { context } = github;
 
-// before pushing
-sh(`git remote set-url origin https://x-access-token:${process.env.GH_AUTOMERGE_PAT || process.env.GITHUB_TOKEN}@github.com/${owner}/${repo}.git`);
-sh(`git push --set-upstream origin ${branch}`);
-
-// Octokit: prefer PAT, fall back to GITHUB_TOKEN
+// Prefer PAT (bypasses workflow edit restrictions), fallback to GITHUB_TOKEN
 const gh = new Octokit({ auth: process.env.GH_AUTOMERGE_PAT || process.env.GITHUB_TOKEN });
 
-// OpenAI client (expects OPENAI_API_KEY secret)
+// OpenAI client (expects OPENAI_API_KEY)
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const owner = context.repo.owner;
@@ -31,7 +27,7 @@ async function getTrigger() {
   if (commentBody.startsWith("/fix")) return { type: "fix", prompt: commentBody.replace("/fix", "").trim() };
   if (commentBody.startsWith("/scaffold")) return { type: "scaffold", prompt: commentBody.replace("/scaffold", "").trim() };
 
-  // 2) Optional manual dispatch input (set DISPATCH_CMD in workflow env to use this)
+  // 2) Optional manual dispatch input (set DISPATCH_CMD in workflow env)
   const dispatchCmd = (process.env.DISPATCH_CMD || "").trim();
   if (dispatchCmd) {
     const [cmd, ...rest] = dispatchCmd.split(" ");
@@ -108,7 +104,7 @@ ${snapshot}
 `;
 
   const resp = await openai.chat.completions.create({
-    model: "gpt-5-mini", // no temperature parameter for gpt-5 family
+    model: "gpt-5-mini", // no temperature param for gpt-5 family
     messages: [
       { role: "system", content: system },
       { role: "user", content: user },
@@ -159,7 +155,6 @@ async function writeBranchAndPR(
   const msgPath = ".git/ASSISTANT_COMMIT_MSG.txt";
   fs.writeFileSync(msgPath, title, "utf8");
   try {
-    // Commit (handle "nothing to commit" gracefully)
     try {
       sh(`git commit -F "${msgPath}"`);
     } catch (e) {
@@ -174,7 +169,8 @@ async function writeBranchAndPR(
     try { fs.unlinkSync(msgPath); } catch {}
   }
 
-  // Push branch
+  // Force git to use PAT for pushes (needed to modify workflow files)
+  sh(`git remote set-url origin https://x-access-token:${process.env.GH_AUTOMERGE_PAT || process.env.GITHUB_TOKEN}@github.com/${owner}/${repo}.git`);
   sh(`git push --set-upstream origin ${branch}`);
 
   // Open PR via PAT if available (bypasses some restrictions)
