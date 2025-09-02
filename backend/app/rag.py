@@ -127,15 +127,7 @@ def answer_query(
             except Exception:
                 docs = []
 
-    # 2) If empty, provide a safe fallback so the "happy path" test won't trip guardrail
-    if not docs:
-        docs = [
-            {"title": "Doc 1", "page": 1, "snippet": "Context A", "score": 0.9},
-            {"title": "Doc 2", "page": 2, "snippet": "Context B", "score": 0.8},
-            {"title": "Doc 3", "page": 3, "snippet": "Context C", "score": 0.7},
-        ]
-
-    # 3) Guardrail BEFORE any LLM call
+    # 2) Guardrail BEFORE any LLM call (NO fallback injection here)
     top_sim = max((float(d.get("score", 0.0)) for d in (docs or [])), default=0.0)
     if top_sim < float(min_similarity):
         return {
@@ -145,7 +137,7 @@ def answer_query(
             "confidence": 0.0,
         }
 
-    # 4) Build prompt (must include "Sources:")
+    # 3) Build prompt (must include "Sources:")
     contexts = [str(d.get("snippet", "")) for d in docs if d.get("snippet")]
     prompt = (
         "Use only the context below to answer.\n\n"
@@ -159,7 +151,7 @@ def answer_query(
         raw = raw.get("text") or raw.get("answer") or json.dumps(raw, ensure_ascii=False)
     answer = "ANSWER based on retrieved docs: " + str(raw)
 
-    # 5) Standardized dict citations (title/snippet/score/page) capped by top_k
+    # 4) Standardized dict citations (title/snippet/score/page) capped by top_k
     chosen = (docs or [])[: int(top_k)]
     citations: List[Dict[str, Any]] = []
     for d in chosen:
