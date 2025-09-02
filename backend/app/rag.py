@@ -1,4 +1,3 @@
-# backend/app/rag.py
 from __future__ import annotations
 
 import json
@@ -163,9 +162,8 @@ def answer_query(
         + "Provide a concise response; this is a stubbed answer."
     )
 
-    # === FINAL SAFETY GUARDRAIL ===
-    # Re-check just before calling the LLM to guarantee NeverLLM is never invoked
-    # when similarity is below threshold (even if a previous branch was skipped).
+    # === FINAL SAFETY GUARDRAIL (belt-and-suspenders) ===
+    # Re-check *immediately before* calling the LLM. If similarity is too low, return.
     top_sim_final_check = max((float(d.get("score", 0.0)) for d in docs), default=0.0)
     if top_sim_final_check < float(min_similarity):
         return {
@@ -175,7 +173,7 @@ def answer_query(
             "confidence": 0.0,
         }
 
-    # 5) Call LLM (we only reach here if guardrail passed or we used the empty-results fallback)
+    # 5) Call LLM (only when guardrail passes)
     raw = llm_client.generate(prompt)
     if isinstance(raw, dict):
         raw = raw.get("text") or raw.get("answer") or json.dumps(raw, ensure_ascii=False)
@@ -192,7 +190,7 @@ def answer_query(
             "score": float(d.get("score", 0.0)),
         })
 
-    # Confidence is the observed top similarity for the docs we used here
+    # Confidence mirrors the similarity used
     return {
         "answer": answer,
         "citations": citations,
