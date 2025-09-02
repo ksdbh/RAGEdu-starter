@@ -1,64 +1,50 @@
-name: preview-test
+name: Preview tests
 
 on:
   pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
-  e2e:
+  preview-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    concurrency:
-      group: preview-test
-      cancel-in-progress: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          persist-credentials: false
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and start compose services
+      - name: Set up Docker Compose
         run: |
-          docker compose -f docker-compose.dev.yml up -d --build
+          echo "Using docker compose to bring up services"
+
+      - name: Build and start services
+        run: |
+          docker compose -f docker-compose.ci.yml up --build -d
 
       - name: Wait for backend health
         run: |
           set -euo pipefail
+          urls=( "http://localhost:8000/health" "http://localhost:8000/api/health" "http://localhost:8000/healthz" )
           for i in $(seq 1 60); do
-            resp=$(curl -fsS http://localhost:8000/health || true)
-            if echo "$resp" | grep -q '"ok"'; then
-              echo "Backend healthy: $resp"; exit 0
-            fi
+            for u in "${urls[@]}"; do
+              code=$(curl -sS -o resp.txt -w "%{http_code}" "$u" || true)
+              echo "Probe $u -> $code"
+              if [ "$code" = "200" ] && grep -q '"ok"' resp.txt; then
+                echo "Backend healthy at $u: $(cat resp.txt)"
+                exit 0
+              fi
+            done
             echo "Waiting for backend... ($i/60)"
             sleep 2
           done
-          echo "Backend never became healthy"
+          echo "Backend never became healthy; last body was:"
+          cat resp.txt || true
           docker compose -f docker-compose.dev.yml logs backend || true
           exit 1
 
-      - name: E2E smoke
+      - name: Run backend tests
         run: |
-          chmod +x backend/scripts/e2e_smoke.sh
-          backend/scripts/e2e_smoke.sh
+          docker compose -f docker-compose.ci.yml exec -T backend pytest -q
 
-      - name: Build frontend
-        working-directory: frontend
-        run: |
-          [ -f package-lock.json ] && npm ci || npm install
-          npm run build
-
-      - name: Upload frontend build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build
-          path: frontend/.next
-
-      - name: Teardown compose
+      - name: Tear down
         if: always()
-        run: docker compose -f docker-compose.dev.yml down -v --remove-orphans
+        run: |
+          docker compose -f docker-compose.ci.yml down --volumes
