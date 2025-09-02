@@ -1,3 +1,4 @@
+# backend/app/rag.py
 from __future__ import annotations
 
 import json
@@ -128,6 +129,9 @@ def _try_fetch_docs(search_client: Any, question: str, *, top_k: int, rerank: bo
 
     return []
 
+def _max_score(docs: List[Dict[str, Any]]) -> float:
+    return max((float(d.get("score", 0.0)) for d in docs), default=0.0)
+
 def answer_query(
     question: str,
     *,
@@ -146,10 +150,9 @@ def answer_query(
     # ---- 1) Fetch documents (do not mutate this original set) ----
     docs_raw: List[Dict[str, Any]] = _try_fetch_docs(search_client, question, top_k=top_k, rerank=rerank)
 
-    # ---- 2) GUARDRAIL: if we actually got docs but similarity is too low, bail out BEFORE any LLM call ----
+    # ---- 2) Primary GUARDRAIL: if we actually got docs but similarity is too low, bail out BEFORE any LLM call ----
     if docs_raw:
-        top_sim = max((float(d.get("score", 0.0)) for d in docs_raw), default=0.0)
-        if top_sim < float(min_similarity):
+        if _max_score(docs_raw) < float(min_similarity):
             return {
                 "answer": GUARDRAIL_NEED_MORE_SOURCES,
                 "citations": [],
@@ -178,6 +181,15 @@ def answer_query(
         + "Provide a concise response; this is a stubbed answer."
     )
 
+    # ---- 4.5) Secondary GUARDRAIL (belt-and-suspenders): never call LLM if low similarity on real docs) ----
+    if docs_raw and _max_score(docs_raw) < float(min_similarity):
+        return {
+            "answer": GUARDRAIL_NEED_MORE_SOURCES,
+            "citations": [],
+            "citations_docs": [],
+            "confidence": 0.0,
+        }
+
     # ---- 5) Call LLM (we only reach here if guardrail didn’t trigger) ----
     raw = llm_client.generate(prompt)
     if isinstance(raw, dict):
@@ -196,7 +208,7 @@ def answer_query(
         })
 
     # Confidence mirrors the similarity we considered (if docs_raw was empty, this is from fallback)
-    conf = max((float(d.get("score", 0.0)) for d in docs), default=0.0)
+    conf = _max_score(docs)
 
     return {
         "answer": answer,
