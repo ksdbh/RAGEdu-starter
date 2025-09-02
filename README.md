@@ -12,16 +12,25 @@ This scaffold demonstrates a Retrieval-Augmented Generation (RAG) approach on AW
 
 ```mermaid
 flowchart LR
-  S3[S3\n(uploaded PDFs / documents)] --> Textract[Amazon Textract\n(text extraction)]
-  Textract --> Chunking[Semantic chunking\n(parse & chunk text)]
-  Chunking --> Embedding[Embedding service\n(Bedrock / OpenAI)]
-  Embedding --> OpenSearch[OpenSearch\n(vector index)]
-  OpenSearch --> Bedrock[LLM (Bedrock / OpenAI)\n(prompt + context)]
-  Bedrock --> FastAPI[Backend (FastAPI)\n/RAG API, ingestion CLI]
-  FastAPI --> Nextjs[Frontend (Next.js)\n/chat UI / auth placeholder]
+  %% --- Components ---
+  S3[(S3: Uploaded PDFs & Docs)]
+  Textract[[Textract / PDF Parser]]
+  Chunker[Chunker + Metadata]
+  Embed[Embeddings (Bedrock Titan)]
+  OS[(OpenSearch Vector Index)]
+  API[FastAPI RAG API]
+  LLM[[Bedrock LLM<br/>(Claude / Titan)]]
+  FE[Next.js Frontend]
 
-  classDef aws fill:#f8fafc,stroke:#111827
-  class S3,Textract,Embedding,OpenSearch,Bedrock aws
+  %% --- Ingestion path ---
+  S3 --> Textract --> Chunker --> Embed --> OS
+
+  %% --- Retrieval path ---
+  FE <--> API
+  API --> OS
+  API --> LLM
+  LLM --> API
+  API --> FE
 ```
 
 📚 Quick start — local development
