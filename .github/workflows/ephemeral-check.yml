@@ -1,0 +1,87 @@
+name: Ephemeral check
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ephemeral-check
+  cancel-in-progress: true
+
+jobs:
+  ephemeral-check:
+    name: Ephemeral stack check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start dev compose stack
+        run: |
+          docker compose -f docker-compose.dev.yml up -d --build
+
+      - name: Wait for backend /health
+        # retry loop: 60 attempts, 2s apart. Prints compose logs on failure.
+        run: |
+          set -eo pipefail
+          echo "Waiting for backend health endpoint http://localhost:8000/health"
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -sSf http://localhost:8000/health >/dev/null 2>&1; then
+              echo "Backend healthy (after $i attempts)"
+              ok=1
+              break
+            fi
+            echo "  attempt $i/60: backend not healthy yet; sleeping 2s"
+            sleep 2
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "Backend did not become healthy after 60 attempts — dumping logs"
+            # try to show service-specific logs first, fall back to full compose logs
+            docker compose -f docker-compose.dev.yml logs --no-color backend || true
+            docker compose -f docker-compose.dev.yml logs --no-color || true
+            exit 1
+          fi
+
+      - name: Run backend e2e smoke script
+        run: |
+          set -eo pipefail
+          if [ -f backend/scripts/e2e_smoke.sh ]; then
+            chmod +x backend/scripts/e2e_smoke.sh
+            backend/scripts/e2e_smoke.sh
+          else
+            echo "backend/scripts/e2e_smoke.sh not found; skipping smoke script"
+          fi
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: |
+          set -eo pipefail
+          npm ci
+          npm run build
+
+      - name: Upload frontend .next artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-next
+          path: frontend/.next
+
+      - name: Teardown compose stack
+        if: always()
+        run: |
+          docker compose -f docker-compose.dev.yml down -v
