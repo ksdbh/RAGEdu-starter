@@ -1,26 +1,79 @@
-name: Preview tests
-
+name: preview-test
 on:
   pull_request:
-  push:
-    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  preview-test:
+  e2e:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 30
+    concurrency:
+      group: preview-test
+      cancel-in-progress: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Locate compose file
+        id: find_compose
+        run: |
+          set -euo pipefail
+          CANDIDATE=""
+          if [ -f "docker-compose.dev.yml" ]; then
+            CANDIDATE="docker-compose.dev.yml"
+          else
+            CANDIDATE="$(find . -maxdepth 3 -name 'docker-compose.dev.yml' -print -quit || true)"
+          fi
+          if [ -z "$CANDIDATE" ]; then
+            echo "No docker-compose.dev.yml found within depth 3"; exit 1
+          fi
+          echo "COMPOSE_FILE=$CANDIDATE" >> $GITHUB_ENV
+          echo "Using compose file: $CANDIDATE"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and start compose services
         run: |
-          # Use the CI compose file (the README suggests docker-compose.ci.yml)
-          docker compose -f docker-compose.ci.yml up -d --build
+          docker compose -f "$COMPOSE_FILE" up -d --build
 
-      - name: Run backend pytest inside backend container
-        run: docker compose exec -T backend pytest -q
+      - name: Wait for backend health
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            resp=$(curl -fsS http://localhost:8000/health || true)
+            if echo "$resp" | grep -q '"ok"'; then
+              echo "Backend healthy: $resp"; exit 0
+            fi
+            echo "Waiting for backend... ($i/60)"
+            sleep 2
+          done
+          echo "Backend never became healthy"
+          docker compose -f "$COMPOSE_FILE" logs backend || true
+          exit 1
 
-      - name: Tear down compose
+      - name: E2E smoke
+        run: |
+          chmod +x backend/scripts/e2e_smoke.sh
+          backend/scripts/e2e_smoke.sh
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          [ -f package-lock.json ] && npm ci || npm install
+          npm run build
+
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/.next
+
+      - name: Teardown compose
         if: always()
-        run: docker compose -f docker-compose.ci.yml down --remove-orphans
+        run: docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
