@@ -8,16 +8,17 @@ WORKDIR /app
 
 # Install deps
 COPY backend/requirements.txt ./requirements.txt
-COPY backend/requirements-dev.txt ./requirements-dev.txt
-RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app code so "backend" is a top-level package
+# Copy code
 COPY backend/ ./backend/
 
-# Ensure Python can import the "backend" package
-ENV PYTHONPATH=/app
+# Make both 'app' and 'backend.app' importable
+# - '/app/backend' lets "import app" find backend/app/
+# - '/app' still allows "import backend.app" if used elsewhere
+ENV PYTHONPATH=/app/backend:/app
 
 EXPOSE 8000
 
-# CI-friendly: no reload
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run using the 'app' import path so both styles work
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
