@@ -1,12 +1,27 @@
-# EduRAG Developer Docs
+# EduRAG — Developer documentation
 
-Welcome to the EduRAG backend documentation. This site explains:
+Short description
 
-- The architecture of the FastAPI app and the RAG pipeline
-- How guardrails and tests work
-- How to run, test, and operate the system
-- Tips for assistant bots to ground themselves in these docs
+EduRAG is a retrieval-augmented generation (RAG) scaffold for building a course-grounded study assistant. This documentation is organized for engineers: Concepts, Getting Started, Tutorials, Reference, Operations, Security, Troubleshooting, Glossary and Changelog.
 
----
+Quick links
 
-_Last updated: {{ build_date | default("today") }}_
+- Getting started: getting-started.md
+- Architecture: architecture.md
+- RAG overview: rag/overview.md
+- Backend endpoints: backend/endpoints.md
+
+!!! note "Repository"
+    Repo: https://github.com/your-org/your-repo
+    Default branch: main
+
+!!! info "Contact / Owners"
+    - Primary owner: <!-- TODO: replace with GitHub handle --> @your-org/platform-team
+    - Docs owner: <!-- TODO: replace with handle --> @your-org/docs
+
+Where this docs tree lives
+
+!!! info "Where to edit"
+- Source: docs/
+- Primary docs file: docs/index.md
+- Site config: mkdocs.yml

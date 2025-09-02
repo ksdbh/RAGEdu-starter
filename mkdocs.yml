@@ -1,64 +1,71 @@
-site_name: EduRAG Dev Docs
-site_description: Developer documentation for the EduRAG backend and assistants
-site_url: https://ksdbh.github.io/RAGEdu-starter/
-repo_url: https://github.com/ksdbh/RAGEdu-starter
+site_name: EduRAG Docs
+site_description: Developer documentation for EduRAG — RAG scaffold for course-grounded study assistance
+site_url: https://github.com/your-org/your-repo
+repo_url: https://github.com/your-org/your-repo
+repo_name: your-org/your-repo
+site_author: EduRAG Team
+
 theme:
   name: material
-  features:
-    - content.code.copy
-    - navigation.instant
-    - navigation.sections
-    - navigation.tracking
-    - search.highlight
-    - search.suggest
+  language: en
   palette:
     - scheme: default
       primary: indigo
       accent: indigo
-
-nav:
-  - Overview: index.md
-  - Getting Started:
-      - Quickstart: getting-started.md
-      - Project Structure: project-structure.md
-  - Concepts:
-      - Architecture: architecture.md
-      - Environments: environments.md
-      - Security Model: security.md
-  - Tutorials:
-      - Deploy to AWS: deployment.md
-  - Reference:
-      - Backend:
-          - Endpoints: backend/endpoints.md
-          - Data Models: backend/data-models.md
-      - RAG:
-          - Overview: rag/overview.md
-          - Ingestion: rag/ingestion.md
-          - Chunking: rag/chunking.md
-          - Embeddings: rag/embeddings.md
-          - Retrieval & Guardrails: rag/retrieval.md
-          - Guardrail Rules: rag/guardrails.md
-  - Operations:
-      - Runbooks: operations/runbooks.md
-      - Monitoring: operations/monitoring.md
-      - Troubleshooting: operations/troubleshooting.md
-  - Testing:
-      - Overview: testing/overview.md
-      - How to Run: testing/how-to-run.md
-      - Conventions: testing/test-conventions.md
-  - Gotchas: gotchas.md
-  - For Assistants: assistant/how-it-uses-docs.md
-  - FAQ: faq.md
-  - Glossary: glossary.md
-  - Changelog: changelog.md
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - toc.integrate
+    - code.copy
+    - content.code.annotate
 
 markdown_extensions:
   - admonition
-  - footnotes
+  - pymdownx.superfences
   - toc:
       permalink: true
-  - pymdownx.details
-  - pymdownx.superfences
 
 plugins:
-  - search
+  - search:
+      separator: "[\s\-]+"
+  - git-revision-date-localized:
+      enabled: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-org/your-repo
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Concepts:
+    - Architecture: architecture.md
+    - Project structure: project-structure.md
+    - RAG overview: rag/overview.md
+  - Tutorials:
+    - Ingestion: rag/ingestion.md
+    - Chunking: rag/chunking.md
+    - Embeddings: rag/embeddings.md
+    - Retrieval & QA: rag/retrieval.md
+    - Guardrails: rag/guardrails.md
+  - Reference:
+    - Backend endpoints: backend/endpoints.md
+    - Data models: backend/data-models.md
+    - AWS integrations: aws/integrations.md
+    - AWS IAM guidance: aws/iam.md
+  - Testing:
+    - Overview: testing/overview.md
+    - How to run tests: testing/how-to-run.md
+    - Test conventions: testing/test-conventions.md
+  - Operations:
+    - Runbooks: operations/runbooks.md
+    - Monitoring: operations/monitoring.md
+    - Troubleshooting: operations/troubleshooting.md
+  - Security: security.md
+  - Troubleshooting: gotchas.md
+  - Assistant: assistant/how-it-uses-docs.md
+  - FAQ: faq.md
+  - Glossary: glossary.md
+  - Changelog: changelog.md
