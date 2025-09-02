@@ -1,0 +1,78 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    # mount code for iterative development
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      # Use stub LLM provider for local/dev
+      - BACKEND_LLM_PROVIDER=stub
+      # Point backend at the local OpenSearch instance in compose
+      - OPENSEARCH_URL=http://opensearch:9200
+      # Wire LocalStack-related AWS envs for local/mock providers
+      - AWS_REGION=us-east-1
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT=http://localstack:4566
+      - AWS_ENDPOINT_URL=http://localstack:4566
+    depends_on:
+      - opensearch
+      - localstack
+    # override default command to enable hot-reload for development
+    command: ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  frontend:
+    image: node:20
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      # frontend should talk to local backend during development
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+    command: sh -c "npm ci && npm run dev"
+    depends_on:
+      - backend
+
+  opensearch:
+    image: opensearchproject/opensearch:2.9.0
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=false
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - DISABLE_SECURITY_PLUGIN=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+
+  localstack:
+    image: localstack/localstack:latest
+    environment:
+      # enable commonly used services for this scaffold (S3/Textract/Cognito/DynamoDB)
+      - SERVICES=s3,textract,cognito,dynamodb,ssm
+      - DEFAULT_REGION=us-east-1
+      - DATA_DIR=/tmp/localstack/data
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - localstack-data:/tmp/localstack
+    ports:
+      - "4566:4566"
+
+volumes:
+  opensearch-data:
+  localstack-data:
