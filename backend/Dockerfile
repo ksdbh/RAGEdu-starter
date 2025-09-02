@@ -8,7 +8,8 @@ WORKDIR /app
 
 # Install deps
 COPY backend/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/requirements-dev.txt ./requirements-dev.txt
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 
 # Copy app code so "backend" is a top-level package
 COPY backend/ ./backend/
