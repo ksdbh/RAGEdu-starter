@@ -1,23 +1,22 @@
-# RAG overview
+# RAG Overview
 
-This page explains the RAG pipeline implemented by EduRAG.
+Retrieval-Augmented Generation (RAG) combines a retrieval component (vector search over documents) with a generative LLM to produce answers grounded in source documents.
 
-Pipeline stages
+Components
 
-1. Ingestion: extract text from documents (Textract or local parser) and create pages.
-2. Chunking: break pages into overlapping chunks with metadata (course_id, page, section).
-3. Embeddings: convert chunks to vectors using the embedding provider.
-4. Indexing: store vectors and metadata in OpenSearch.
-5. Retrieval & QA: API fetches top-k chunks, composes prompt, calls LLM to synthesize an answer.
+- Ingest: parse PDFs/slides to text and split into chunks with metadata.
+- Embed: compute vector embeddings for chunks.
+- Index: store vectors in OpenSearch or vector DB.
+- Retrieve: find top-k relevant passages.
+- Compose: build a prompt including retrieved passages and call the LLM.
 
-Design goals
+Best practices
 
-- Ground answers in course materials with explicit citations.
-- Be robust to missing AWS credentials by providing stubs for local dev.
-- Keep LLM prompts minimal and deterministic where possible.
+- Keep chunks small enough for clear citations (~500–1,000 chars) but large enough to preserve context.
+- Return sources with page/section metadata to allow UI citations.
 
 Where to edit
 
 !!! info "Where to edit"
-- Pipeline code: backend/app/ingest.py, backend/app/rag.py
-- Tests: backend/tests/
+    Source: docs/rag/overview.md
+    Code: backend/app/ingest.py, backend/app/rag.py

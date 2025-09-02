@@ -1,22 +1,27 @@
 # Test conventions
 
-Conventions to follow when adding tests.
+- Use pytest fixtures for shared resources.
+- Name tests clearly: test_<unit>__<condition>__<expected>().
+- Keep unit tests fast and deterministic — use StubEmbeddings for embeddings.
+- For API tests: use TestClient from FastAPI (backend/app/main.py) and include auth headers with mock tokens.
 
-Naming
+Example test snippet
 
-- Test files: tests/test_*.py
-- Test functions: test_<behavior>
+```python
+from fastapi.testclient import TestClient
+from backend.app.main import app
 
-Fixtures
+client = TestClient(app)
 
-- Use pytest fixtures for shared setup (client, mock embeddings, mock auth).
-
-Mocks & stubs
-
-- Use MockCognitoClient for auth; set environment USE_IN_MEMORY_DB=1 for db tests.
+def test_whoami_student():
+    resp = client.get("/whoami", headers={"Authorization": "Bearer student_token"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["role"] == "student"
+```
 
 Where to edit
 
 !!! info "Where to edit"
-- Conventions: docs/testing/test-conventions.md
-- Example fixtures: backend/tests/conftest.py (create if missing)
+    Source: docs/testing/test-conventions.md
+    Tests: backend/tests/

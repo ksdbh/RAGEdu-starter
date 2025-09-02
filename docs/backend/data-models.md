@@ -1,30 +1,15 @@
 # Data models
 
-This file points to the primary Python modules that define runtime data models.
+This page links to and summarizes key data models used by the backend. For full edits, update the source models under backend/app/**/*.py.
 
-Primary sources
+Key in-repo models
 
-- backend/app/db.py — CourseSyllabusStore and data storage helpers
-- backend/app/ingest.py — Chunk dataclass and chunking helpers
-- backend/app/auth.py — User model (pydantic) and auth interfaces
-
-Common model shapes
-
-- Chunk (in memory representation)
-  - text: string
-  - start: int
-  - end: int
-
-- Course / Syllabus
-  - course_id: string
-  - title: string
-  - metadata: object
+- User (Pydantic): backend/app/auth.py — User model with sub, username, email, role, roles.
+- Chunk / ingestion objects: backend/app/ingest.py — Chunk dataclass, chunk_pages output format.
+- DB store: backend/app/db.py — CourseSyllabusStore: create_course, get_course, create_syllabus, get_syllabus (in-memory by default).
 
 Where to edit
 
 !!! info "Where to edit"
-- Source models: backend/app/**/*.py
-- DB: backend/app/db.py
-- Ingest: backend/app/ingest.py
-
-<!-- TODO: If you introduce pydantic models for API payloads, place them in backend/app/models.py. Owner: @backend-owner -->
+    Source: docs/backend/data-models.md
+    Files: backend/app/auth.py, backend/app/ingest.py, backend/app/db.py

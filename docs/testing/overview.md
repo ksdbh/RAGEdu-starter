@@ -1,18 +1,18 @@
-# Testing overview
+# Testing Overview
 
-Testing strategy
+Strategy
 
-- Unit tests: fast, no AWS calls. Use stubs (MockCognitoClient, StubEmbeddings).
-- Integration tests: optional, can exercise docker-compose CI or LocalStack.
-- End-to-end: deploy to test/staging with real AWS resources and run smoke tests.
+- Unit tests: pure logic (chunking, embedding stubs, auth mockups)
+- Integration tests: fast CI with stubs and docker compose (if available)
+- E2E / smoke: run backend + frontend with sample data to exercise the RAG flow
 
-Where tests live
+Tools
 
-- backend/tests/ — pytest tests for backend
-- frontend/ — frontend tests (if present)
+- pytest for Python backend
+- CI workflows run tests on PRs
 
 Where to edit
 
 !!! info "Where to edit"
-- Test docs: docs/testing/overview.md
-- Test files: backend/tests/
+    Source: docs/testing/overview.md
+    Tests: backend/tests/

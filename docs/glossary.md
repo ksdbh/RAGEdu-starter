@@ -1,11 +1,10 @@
 # Glossary
 
-- Chunk: a contiguous piece of text produced by chunking logic.
-- Embedding: numeric vector representing text semantics.
-- RAG: Retrieval-Augmented Generation — combining retrieval with LLM synthesis.
-- LLM provider: service producing model completions (OpenAI, Bedrock, stub).
+- Chunk: A contiguous piece of text extracted from a document used for embedding and retrieval.
+- Embedding: A numeric vector representing semantic meaning of a text span.
+- RAG: Retrieval-Augmented Generation — combining retrieval + LLM.
 
 Where to edit
 
 !!! info "Where to edit"
-- Glossary: docs/glossary.md
+    Source: docs/glossary.md

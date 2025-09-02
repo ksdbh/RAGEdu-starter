@@ -1,25 +1,19 @@
-# Security posture
+# Security
 
-Summary
+High-level security posture
 
-- Secrets: do not commit keys. Use AWS Secrets Manager, SSM Parameter Store, or GitHub Actions secrets.
-- AuthN/Z: Cognito for production; MockCognitoClient for dev/test.
-- Data handling: redact sensitive PII at ingestion time if required.
+- AuthN: Cognito (mock in dev). Use RealCognitoClient in production and validate JWTs.
+- Secrets: store in GitHub Actions secrets, AWS Secrets Manager, or Parameter Store. Do not commit to git.
+- Data: redact sensitive PII before storing embeddings or sending to external LLMs where necessary.
 
-Practical rules
+Recommendations
 
-1. Never check in API keys or credentials.
-2. Use environment variables or mounted secrets for runtime.
-3. Limit LLM output exposure; log inputs/outputs selectively and avoid storing user secrets.
-
-Adversarial inputs
-
-- Validate and sanitize user-supplied instructions before sending to LLMs.
-- Apply guardrails (see docs/rag/guardrails.md).
+- Audit LLM prompts for data leaks.
+- Use rate limits and quota controls to mitigate cost & abuse.
+- Enable VPC access to OpenSearch and restrict ingress.
 
 Where to edit
 
 !!! info "Where to edit"
-- Security notes: docs/security.md
-- Auth implementation: backend/app/auth.py
-- Guardrails: backend/app/rag.py
+    Source: docs/security.md
+    Code: backend/app/auth.py, infra/

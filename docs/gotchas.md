@@ -1,11 +1,11 @@
-# Common gotchas
+# Common Gotchas
 
-- Token vs Bearer: FastAPI HTTPBearer expects the token after "Bearer ". In local mock tests you can pass bare tokens in Authorization header.
-- Vector dims mismatch: When creating OpenSearch index ensure the embedding dim matches the embeddings you write.
-- Real AWS vs stubs: setting COGNITO_USER_POOL_ID or AWS_ENDPOINT_URL will change behavior — review logs carefully.
+- Stubs vs production: many components are intentionally stubbed (embeddings, Cognito). Replacing them requires wiring secrets and adjusting response shapes.
+- Token limits: prompt + retrieved context may exceed LLM context window. Be conservative with top_k and chunk sizes.
+- OpenSearch types: mapping for vector fields varies by OpenSearch version. Verify mapping before indexing.
 
 Where to edit
 
 !!! info "Where to edit"
-- Gotchas: docs/gotchas.md
-- Relevant code: backend/app/auth.py, backend/app/ingest.py
+    Source: docs/gotchas.md
+    Fixes: backend/app/ingest.py, backend/app/rag.py, infra/

@@ -1,32 +1,27 @@
 # Project structure
 
-Short prescriptive tree of important paths and responsibilities.
+Concrete file layout (top-level)
 
-Top-level layout
-
-- backend/ — FastAPI application and ingestion logic
-  - backend/app/
-    - main.py — FastAPI app entrypoint and route registrations
-    - auth.py — Cognito / Mock auth helpers
-    - ingest.py — ingestion, chunking, and embedding stubs
-    - rag.py — retrieval and QA orchestration (answers) <!-- TODO: create/verify -->
+- backend/ — FastAPI backend, ingestion CLI, tests
+  - backend/app/ — Python package (FastAPI app)
+    - main.py — FastAPI app and routes
+    - ingest.py — ingestion and chunking helpers
+    - rag.py — retrieval / answer composition (TODO: ensure present)
+    - auth.py — mock & real Cognito client
     - db.py — course & syllabus store
-  - requirements.txt, requirements-dev.txt
-- frontend/ — Next.js chat UI
-- infra/ — Terraform scaffolding for S3, Textract, OpenSearch, Cognito, API Gateway
-- docs/ — this documentation (MkDocs)
+  - tests/ — pytest tests
+- frontend/ — Next.js frontend
+- infra/ — Terraform scaffolding (S3, Cognito, OpenSearch)
+- docs/ — MkDocs Material documentation (this site)
 
-Owners & edit points
+Common commands
 
-| Area | Path | Owner |
-|------|------|-------|
-| Backend entry | backend/app/main.py | @backend-owner <!-- TODO: replace -->
-| Ingest pipeline | backend/app/ingest.py | @data-team <!-- TODO: replace -->
-| RAG logic | backend/app/rag.py | @ml-team <!-- TODO: replace -->
-| Terraform infra | infra/ | @infra-team <!-- TODO: replace -->
+- Backend dev: uvicorn backend.app.main:app --reload --port 8000
+- Backend tests: cd backend && pytest -q
+- Frontend dev: cd frontend && npm run dev
 
 Where to edit
 
 !!! info "Where to edit"
-- Source: backend/app/
-- Docs: docs/project-structure.md
+    Source: docs/project-structure.md
+    Owner: maintainers listed in CODEOWNERS

@@ -1,27 +1,23 @@
-# EduRAG — Developer documentation
+# EduRAG — Developer Guide
 
 Short description
 
-EduRAG is a retrieval-augmented generation (RAG) scaffold for building a course-grounded study assistant. This documentation is organized for engineers: Concepts, Getting Started, Tutorials, Reference, Operations, Security, Troubleshooting, Glossary and Changelog.
+EduRAG is a scaffold for a Retrieval-Augmented Generation (RAG) study assistant: ingest course materials (PDFs/slides) → extract text → chunk → embed → index → retrieve and synthesize answers with an LLM. This documentation describes architecture, developer workflows, and operational runbooks for production-ready work.
 
-Quick links
+Key sections
 
-- Getting started: getting-started.md
-- Architecture: architecture.md
-- RAG overview: rag/overview.md
-- Backend endpoints: backend/endpoints.md
+- Getting Started: quick local dev and deploy guidance
+- Concepts: core RAG design, ingestion, chunking, embeddings, retrieval
+- Tutorials & Reference: API contracts, code locations, and examples
+- Operations & Security: runbooks, IAM hints, and secrets guidance
 
-!!! note "Repository"
+!!! note "Repository & contacts"
     Repo: https://github.com/your-org/your-repo
     Default branch: main
+    Maintainers: <!-- TODO: add CODEOWNERS entries -->
 
-!!! info "Contact / Owners"
-    - Primary owner: <!-- TODO: replace with GitHub handle --> @your-org/platform-team
-    - Docs owner: <!-- TODO: replace with handle --> @your-org/docs
-
-Where this docs tree lives
+Where to edit
 
 !!! info "Where to edit"
-- Source: docs/
-- Primary docs file: docs/index.md
-- Site config: mkdocs.yml
+    Source: docs/index.md
+    Owner: @your-org/platform-team

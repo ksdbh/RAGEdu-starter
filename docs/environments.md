@@ -1,38 +1,28 @@
 # Environments
 
-This project targets three typical environments: dev, staging, prod. The scaffold provides patterns and environment-specific differences.
+Supported environments and differences
 
-Environment differences
+- dev (local): Uses MockCognitoClient, in-memory DB, and stubbed embedding/LLM providers. No real AWS credentials required.
+- staging: Intended to use real AWS services in a sandbox account. Configure Cognito, S3, and OpenSearch. Use smaller instance sizes and feature flags for lower cost.
+- prod: Hardened configuration, stricter IAM, monitoring, and backups. Use real Bedrock/OpenAI keys and production OpenSearch clusters.
 
-- dev
-  - Local services or stubs (MockCognitoClient, StubEmbeddings, in-memory DB)
-  - No production secrets; set OPENAI_API_KEY or other provider keys only if testing.
-  - Useful for iteration and unit tests.
-- staging
-  - Mirrors production infrastructure in AWS using a non-production AWS account/namespace.
-  - Real S3, OpenSearch, Cognito; LLM provider can be real or limited.
-- prod
-  - Hardened, monitoring, stricter IAM, cost controls.
+Environment variables (most important)
 
-Configuration sources
+| Env var | Purpose | Notes |
+|---|---|---|
+| AWS_REGION | AWS region | e.g. us-east-1 |
+| COGNITO_USER_POOL_ID | If present, RealCognitoClient is used | Leave unset in local dev |
+| OPENAI_API_KEY | Optional; used if OPENAI provider selected | Store in secret manager for prod |
+| BACKEND_LLM_PROVIDER | Provider selection (stub, openai, bedrock) | Default: stub |
+| USE_IN_MEMORY_DB | 1 = in-memory course store | Default for tests/dev |
 
-- Environment variables (recommended for secrets in dev):
-  - AWS_REGION
-  - COGNITO_USER_POOL_ID
-  - OPENAI_API_KEY or BEDROCK credentials
-  - BACKEND_LLM_PROVIDER
-  - AWS_ENDPOINT_URL (for localstack / test endpoints)
+Secrets handling
 
-Deployment pointers
-
-- Use infra/ Terraform to create resources for staging/prod (see docs/aws/integrations.md and infra/).
-
-Ownership and runbooks
-
-- Each environment should have owners and runbooks (see operations/runbooks.md). Tag Terraform states and SSM/ParameterStore secrets by environment.
+!!! warning "Secrets"
+    Never commit credentials or keys. Use GitHub secrets for CI and AWS Secrets Manager or Parameter Store in prod.
 
 Where to edit
 
 !!! info "Where to edit"
-- Environment docs: docs/environments.md
-- Infra code: infra/
+    Source: docs/environments.md
+    Code: backend/app/auth.py, backend/app/db.py

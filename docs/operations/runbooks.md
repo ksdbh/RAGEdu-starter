@@ -1,27 +1,18 @@
 # Runbooks
 
-On-call runbook for common incidents.
+On-call runbook (quick)
 
-Incident: API 500s
+1. Alert: RAG API errors / high latency
+2. Check: CI/CD or deploy logs and CloudWatch/OpenSearch metrics
+3. Rollback: revert to previous deployment via CI if recent change caused issue
+4. Mitigate: scale up OpenSearch nodes or reduce LLM concurrency
 
-1. Check backend logs (CloudWatch / container logs).
-2. Validate /health endpoint.
-3. If recent deploy, roll back to prior task definition.
+Emergency contact & ownership
 
-Incident: Index not returning results
-
-1. Verify OpenSearch cluster health.
-2. Check index mappings & dims.
-3. Confirm embeddings were created and vectors stored.
-
-Pager escalation
-
-- Level 1: engineer on-call
-- Level 2: platform lead
-- Level 3: infra owner
+- Add team on-call contact here. <!-- TODO: fill CODEOWNERS and on-call rotation -->
 
 Where to edit
 
 !!! info "Where to edit"
-- Runbook: docs/operations/runbooks.md
-- Monitoring config: docs/operations/monitoring.md
+    Source: docs/operations/runbooks.md
+    Ops: infra/ and monitoring config

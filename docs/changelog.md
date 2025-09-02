@@ -1,12 +1,10 @@
 # Changelog
 
-All notable changes to this project should be recorded in this file.
+All notable changes to this project will be documented in this file.
 
-Unreleased
-
-- Initial docs scaffolded (MkDocs) — add release notes per PR.
+- 0.1.0 — Initial scaffold and documentation added.
 
 Where to edit
 
 !!! info "Where to edit"
-- Changelog: docs/changelog.md
+    Source: docs/changelog.md
