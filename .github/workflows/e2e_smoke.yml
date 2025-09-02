@@ -1,0 +1,26 @@
+name: E2E Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Make e2e script executable
+        run: chmod +x backend/scripts/e2e_smoke.sh
+
+      - name: Run e2e smoke script
+        run: |
+          echo "Running backend/scripts/e2e_smoke.sh"
+          ./backend/scripts/e2e_smoke.sh
