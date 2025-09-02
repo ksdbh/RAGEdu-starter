@@ -12,20 +12,19 @@ This scaffold demonstrates a Retrieval-Augmented Generation (RAG) approach on AW
 
 ```mermaid
 flowchart LR
-  %% --- Components ---
-  S3[(S3: Uploaded PDFs & Docs)]
-  Textract[[Textract / PDF Parser]]
-  Chunker[Chunker + Metadata]
-  Embed[Embeddings (Bedrock Titan)]
-  OS[(OpenSearch Vector Index)]
+  S3[S3 uploads]
+  Textract[Textract or PDF parser]
+  Chunker[Chunker and metadata]
+  Embed[Embeddings via Bedrock Titan]
+  OS[OpenSearch vector index]
   API[FastAPI RAG API]
-  LLM[[Bedrock LLM<br/>(Claude / Titan)]]
-  FE[Next.js Frontend]
+  LLM[Bedrock LLM Claude or Titan]
+  FE[Next.js frontend]
 
-  %% --- Ingestion path ---
+  %% Ingestion
   S3 --> Textract --> Chunker --> Embed --> OS
 
-  %% --- Retrieval path ---
+  %% Retrieval
   FE <--> API
   API --> OS
   API --> LLM
