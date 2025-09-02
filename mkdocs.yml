@@ -15,17 +15,43 @@ theme:
     - scheme: default
       primary: indigo
       accent: indigo
+
 nav:
   - Overview: index.md
-  - Architecture: architecture.md
-  - Backend:
-      - Endpoints: backend.md
-      - RAG Pipeline: rag.md
-      - Guardrails: guardrails.md
-  - Testing: testing.md
+  - Getting Started:
+      - Quickstart: getting-started.md
+      - Project Structure: project-structure.md
+  - Concepts:
+      - Architecture: architecture.md
+      - Environments: environments.md
+      - Security Model: security.md
+  - Tutorials:
+      - Deploy to AWS: deployment.md
+  - Reference:
+      - Backend:
+          - Endpoints: backend/endpoints.md
+          - Data Models: backend/data-models.md
+      - RAG:
+          - Overview: rag/overview.md
+          - Ingestion: rag/ingestion.md
+          - Chunking: rag/chunking.md
+          - Embeddings: rag/embeddings.md
+          - Retrieval & Guardrails: rag/retrieval.md
+          - Guardrail Rules: rag/guardrails.md
+  - Operations:
+      - Runbooks: operations/runbooks.md
+      - Monitoring: operations/monitoring.md
+      - Troubleshooting: operations/troubleshooting.md
+  - Testing:
+      - Overview: testing/overview.md
+      - How to Run: testing/how-to-run.md
+      - Conventions: testing/test-conventions.md
   - Gotchas: gotchas.md
-  - For Assistants: assistant.md
-  - Operations: ops.md
+  - For Assistants: assistant/how-it-uses-docs.md
+  - FAQ: faq.md
+  - Glossary: glossary.md
+  - Changelog: changelog.md
+
 markdown_extensions:
   - admonition
   - footnotes
@@ -33,5 +59,6 @@ markdown_extensions:
       permalink: true
   - pymdownx.details
   - pymdownx.superfences
+
 plugins:
   - search
