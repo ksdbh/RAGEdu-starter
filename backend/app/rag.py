@@ -163,6 +163,18 @@ def answer_query(
         + "Provide a concise response; this is a stubbed answer."
     )
 
+    # === FINAL SAFETY GUARDRAIL ===
+    # Re-check just before calling the LLM to guarantee NeverLLM is never invoked
+    # when similarity is below threshold (even if a previous branch was skipped).
+    top_sim_final_check = max((float(d.get("score", 0.0)) for d in docs), default=0.0)
+    if top_sim_final_check < float(min_similarity):
+        return {
+            "answer": GUARDRAIL_NEED_MORE_SOURCES,
+            "citations": [],
+            "citations_docs": [],
+            "confidence": 0.0,
+        }
+
     # 5) Call LLM (we only reach here if guardrail passed or we used the empty-results fallback)
     raw = llm_client.generate(prompt)
     if isinstance(raw, dict):
@@ -181,11 +193,9 @@ def answer_query(
         })
 
     # Confidence is the observed top similarity for the docs we used here
-    top_sim_final = max((float(d.get("score", 0.0)) for d in docs), default=0.0)
-
     return {
         "answer": answer,
         "citations": citations,
         "citations_docs": chosen,
-        "confidence": float(top_sim_final),
+        "confidence": float(top_sim_final_check),
     }
