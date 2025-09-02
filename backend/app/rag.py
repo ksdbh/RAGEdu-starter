@@ -35,9 +35,7 @@ def build_knn_query(
     field: str = "embedding",
     k: int = 3
 ) -> Dict[str, Any]:
-    """
-    Build a simple k-NN query for OpenSearch vector fields.
-    """
+    """Build a simple k-NN query for OpenSearch vector fields."""
     return {
         "size": k,
         "query": {
@@ -80,9 +78,7 @@ def retrieve(
     top_k: int = 3,
     field: str = "embedding",
 ) -> List[HitDoc]:
-    """
-    Run a k-NN search and return normalized hit docs.
-    """
+    """Run a k-NN search and return normalized hit docs."""
     body = build_knn_query(vector=vector, field=field, k=top_k)
     res = client.search(index=index, body=body)
     return _normalize_hits(res)
@@ -95,9 +91,7 @@ def generate_answer(
     contexts: Sequence[str],
     system: Optional[str] = "You are a helpful study assistant. Ground answers in provided context."
 ) -> str:
-    """
-    Extremely small wrapper to form a prompt and call the LLM.
-    """
+    """Form a prompt and call the LLM."""
     ctx_block = "\n\n".join(f"- {c}" for c in contexts if c)
     prompt = (
         f"{system}\n\n"
@@ -119,7 +113,7 @@ def rag_answer(
     field: str = "embedding",
 ) -> Dict[str, Any]:
     """
-    Convenience orchestration suitable for tests:
+    Orchestration for tests:
       - retrieve top_k docs
       - generate answer
       - return {"answer": str, "citations": [sources]}
@@ -127,6 +121,30 @@ def rag_answer(
     hits = retrieve(client, index=index, vector=embedding, top_k=top_k, field=field)
     contexts = [h.get("text", "") for h in hits]
     answer = generate_answer(llm, question=question, contexts=contexts)
-
     citations = [h.get("source", "") for h in hits if h.get("source")]
     return {"answer": answer, "citations": citations}
+
+
+# NEW: alias expected by tests
+def answer_query(
+    llm: LLMAdapterInterface,
+    client: OpenSearchClientInterface,
+    *,
+    index: str,
+    question: str,
+    embedding: Sequence[float],
+    top_k: int = 3,
+    field: str = "embedding",
+) -> Dict[str, Any]:
+    """
+    Compatibility wrapper expected by tests.
+    Delegates to rag_answer and returns the same shape.
+    """
+    return rag_answer(
+        llm, client,
+        index=index,
+        question=question,
+        embedding=embedding,
+        top_k=top_k,
+        field=field,
+    )
