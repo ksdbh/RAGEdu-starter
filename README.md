@@ -181,7 +181,7 @@ Workflows are configured to publish badges in this README — update the OWNER/R
 - Frontend: frontend/ (Next.js)
 - RAG pipeline overview (docs): https://ksdbh.github.io/RAGEdu-starter//rag.md
 - Operations / Runbooks: https://ksdbh.github.io/RAGEdu-starter//runbooks.md
-- Testing docs: {{ docs_url }}/testing.md
+- Testing docs: https://ksdbh.github.io/RAGEdu-starter//testing.md
 - CONTRIBUTING guide: ./CONTRIBUTING.md
 - Changelog: https://ksdbh.github.io/RAGEdu-starter//changelog.md
 
