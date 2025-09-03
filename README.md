@@ -173,17 +173,17 @@ Workflows are configured to publish badges in this README — update the OWNER/R
 
 ## Reference — quick links
 
-- Developer docs portal: {{ docs_url }}
+- Developer docs portal: https://ksdbh.github.io/RAGEdu-starter/
 - Backend entrypoint: backend/app/main.py
 - Ingest CLI: backend/app/ingest.py
 - Auth helpers (mock + Cognito): backend/app/auth.py
 - DB fallback store: backend/app/db.py
 - Frontend: frontend/ (Next.js)
-- RAG pipeline overview (docs): {{ docs_url }}/rag.md
-- Operations / Runbooks: {{ docs_url }}/runbooks.md
+- RAG pipeline overview (docs): https://ksdbh.github.io/RAGEdu-starter//rag.md
+- Operations / Runbooks: https://ksdbh.github.io/RAGEdu-starter//runbooks.md
 - Testing docs: {{ docs_url }}/testing.md
 - CONTRIBUTING guide: ./CONTRIBUTING.md
-- Changelog: {{ docs_url }}/changelog.md
+- Changelog: https://ksdbh.github.io/RAGEdu-starter//changelog.md
 
 Note: replace {{ docs_url }} with your MkDocs Material site URL (or local docs path if serving docs with mkdocs serve).
 
@@ -206,7 +206,7 @@ Long term (📈):
 - Automated syllabus mapping and personalized study plans
 - Collaborative features: shared flashcards, study groups
 
-Full changelog & roadmap: {{ docs_url }}/changelog.md
+Full changelog & roadmap: https://ksdbh.github.io/RAGEdu-starter//changelog.md
 
 ---
 
