@@ -1,161 +1,228 @@
 # EduRAG — AI study companion grounded in your course content
 
-Tagline: EduRAG — AI study companion grounded in your course content
+[![CI](https://github.com/<OWNER>/<REPO>/actions/workflows/preview-test.yml/badge.svg?branch=main)](https://github.com/<OWNER>/<REPO>/actions/workflows/preview-test.yml)
+[![Docs]({{ docs_url }}/assets/badge.svg)]({{ docs_url }})
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-🚀 High-level pitch
+Tagline: EduRAG — a Retrieval-Augmented Generation scaffold that answers student questions with citations from course materials.
 
-Students struggle to surface the right passages from slides, PDFs and syllabi when studying: notes get scattered, search returns noisy results, and context is lost when asking an LLM. EduRAG addresses these pain points by combining semantic retrieval over your course materials with an LLM that composes grounded answers with citations.
+---
 
-This scaffold demonstrates a Retrieval-Augmented Generation (RAG) approach on AWS: ingest PDFs → extract text (Textract) → chunk & embed → index vectors (OpenSearch) → retrieve + synthesize answers with an LLM (Bedrock / OpenAI). Our vision is a lightweight, secure, and extensible study assistant that helps students learn faster while keeping answers tied to course sources.
+## Pitch — why EduRAG
 
-🧭 Quick architecture (visual)
+Students and instructors need fast, reliable answers tied to course materials (slides, PDFs, syllabi). LLMs are powerful but can hallucinate or lose context. EduRAG provides a scaffolded RAG pipeline that keeps responses grounded in course content by combining document ingestion, semantic chunking, embeddings, vector search, and LLM synthesis with citations.
+
+How it works (high level):
+
+- Ingestion: upload PDFs / slides to S3 (or run local ingest CLI) — files are OCR'd or parsed.
+- Chunking: documents are split into semantic chunks with light metadata (page, section, course).
+- Embedding: text chunks are converted to vector embeddings (Bedrock / OpenAI or local stub).
+- Indexing / Retrieval: vectors are stored in OpenSearch (or a stub) for fast similarity search.
+- Answer generation: FastAPI composes top-k retrieved passages into a prompt for an LLM (Bedrock / OpenAI) and returns answers with citations to the frontend.
+
+---
+
+## Architecture (data flow)
 
 ```mermaid
 flowchart LR
-  S3[S3 uploads]
-  Textract[Textract or PDF parser]
-  Chunker[Chunker and metadata]
-  Embed[Embeddings via Bedrock Titan]
-  OS[OpenSearch vector index]
-  API[FastAPI RAG API]
-  LLM[Bedrock LLM Claude or Titan]
-  FE[Next.js frontend]
+  S3[S3 (uploaded PDFs / documents)] --> Textract[Amazon Textract / PDF parser]
+  Textract --> Chunking[Semantic chunking & metadata]
+  Chunking --> Embedding[Embedding service (Bedrock / OpenAI / stub)]
+  Embedding --> OpenSearch[OpenSearch (vector index) / stub]
+  OpenSearch --> FastAPI[FastAPI (backend/app/main.py)]
+  FastAPI --> LLM[LLM (Bedrock / OpenAI / stub)]
+  LLM --> FastAPI
+  FastAPI --> NextJS[Next.js frontend (frontend/)]
 
-  %% Ingestion
-  S3 --> Textract --> Chunker --> Embed --> OS
-
-  %% Retrieval
-  FE <--> API
-  API --> OS
-  API --> LLM
-  LLM --> API
-  API --> FE
+  classDef aws fill:#f3f4f6,stroke:#111827
+  class S3,Textract aws
 ```
 
-📚 Quick start — local development
+---
 
-Prereqs: Git, Python 3.11, Node 20, Docker (optional), Make (convenience targets available in the Makefile).
+## Getting started (local developer onboarding)
 
-1. Clone the repo
+This README is intended to be the front door for developers. Replace placeholders below (OWNER, REPO, BRANCH, and docs_url) with your repository-specific values.
 
-   ```bash
-   git clone https://github.com/your-org/your-repo.git
-   cd your-repo
-   ```
+Prerequisites
 
-2. Devcontainer (optional): The repo includes a .devcontainer that runs postCreateCommand to install backend + frontend deps.
+- Git
+- Python 3.11
+- Node 20 / npm
+- Docker (optional for devcontainer and docker-compose)
+- Make (optional; convenience targets included)
+- (Optional) Terraform & AWS CLI when working with infra
 
-3. Local (fast) startup using the stub LLM provider
+Clone the repository
 
-   - The repo includes a docker-compose.ci.yml for simpler CI-style builds and local integration testing. To build/run the services with the CI compose file:
+```bash
+git clone https://github.com/<OWNER>/<REPO>.git
+cd <REPO>
+# or use your fork / org URL
+```
 
-     ```bash
-     docker compose -f docker-compose.ci.yml up --build
-     ```
+Devcontainer
 
-   - For local iterative development you can run backend and frontend independently.
+This repo includes an opinionated VS Code devcontainer (.devcontainer/devcontainer.json). Opening in the container will run the post-create steps:
 
-   Backend (Python / FastAPI)
+- pip install -r backend/requirements.txt
+- cd frontend && npm i
 
-   ```bash
-   # set a stub provider so the backend uses the local LLM/test stub
-   export BACKEND_LLM_PROVIDER=stub
-   # (optional) set AWS region or other env vars if you want to test real AWS paths
-   cd backend
-   # run with hot reload
-   uvicorn backend.app.main:app --reload --port 8000
-   # or use the Makefile convenience
-   make backend-run
-   ```
+Local backend (FastAPI)
 
-   Frontend (Next.js)
+- Backend entrypoint: backend/app/main.py
 
-   ```bash
-   cd frontend
-   # ensure deps installed
-   npm ci
-   # point the frontend at the local backend if needed
-   export NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
-   npm run dev
-   ```
+Start the backend with hot reload:
 
-🧪 Running tests
+```bash
+# from repo root
+# option A: Use Makefile helper
+make backend-run
 
-- Backend unit tests (pytest):
+# option B: direct uvicorn (explicit path)
+cd backend
+uvicorn backend.app.main:app --reload --port 8000
+```
 
-  ```bash
-  cd backend
-  pytest -q
-  # or use the Makefile helper
-  make backend-test
-  ```
+Notes / environment variables (local dev)
 
-- Frontend tests (if present):
+- BACKEND_LLM_PROVIDER=stub        # use the local LLM stub
+- OPENAI_API_KEY                   # when calling OpenAI paths
+- COGNITO_USER_POOL_ID, AWS_REGION # for real Cognito (optional)
+- AWS_ENDPOINT_URL                 # local endpoints (LocalStack) if used
 
-  ```bash
-  cd frontend
-  npm test
-  ```
+Local frontend (Next.js)
 
-CI pipeline overview
+- Frontend entrypoint: frontend/ (Next.js app)
 
-- The repository includes GitHub Actions workflows to run tests and create preview artifacts. Key workflows:
-  - .github/workflows/preview-test.yml — runs unit tests (backend), builds the frontend, and uploads artifacts (test logs, coverage) to help debugging PRs.
-  - .github/workflows/preview-aws.yml — (optional) deploys ephemeral preview environments to AWS using Terraform when configured.
+```bash
+cd frontend
+npm ci
+# Point the frontend to the backend as needed
+export NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+npm run dev
+```
 
-Workflows upload artifacts for failed runs and (optionally) persist preview URLs for reviewers. See the workflows directory for the exact steps and artifact names.
+Docker / CI-style local run
 
-⚙️ Deployment overview
+To run the services using the CI compose file (useful for integration testing):
 
-- Infrastructure is managed as Terraform scaffolding under infra/ (look for S3, Textract, OpenSearch, Cognito, API Gateway). The Terraform code is intentionally a minimal scaffold — review and harden before using in production.
+```bash
+# builds images and brings up services using the CI compose file
+docker compose -f docker-compose.ci.yml up --build
+```
 
-- Secrets & credentials
-  - For GitHub Actions: configure repository secrets such as AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, and any provider keys (e.g. BEDROCK_API_KEY or OPENAI_API_KEY) used by workflows.
-  - For runtime: set environment variables in your hosting environment (COGNITO_USER_POOL_ID, BACKEND_LLM_PROVIDER, etc.).
+Makefile conveniences
 
-- preview-aws.yml: a workflow that can provision or update preview stacks for PRs using Terraform and will store outputs as workflow artifacts or environment files for the frontend to consume.
+Available targets (see Makefile):
 
-🛠️ What’s implemented (MVP)
+- make devcontainer-setup   - install backend & frontend deps
+- make backend-run          - run the FastAPI app (uvicorn)
+- make backend-test         - run pytest in backend/
+- make ingest FILE=...      - run ingestion CLI (from backend/)
+- make frontend-install     - cd frontend && npm ci
+- make frontend-dev         - cd frontend && npm run dev
+- make infra-plan/apply/destroy - terraform helpers (if infra/ exists)
 
-- Document ingestion pipeline scaffold (ingest CLI) with local parsing and chunking.
-- Mock / stubbed auth (MockCognitoClient) for fast iteration locally.
-- Embedding and retrieval stubs with an OpenSearch-like interface for vector search.
-- FastAPI backend with RAG answer endpoint skeleton and health checks.
-- Minimal Next.js frontend with chat UI placeholder to exercise the backend.
-- DynamoDB recorder and Course/Syllabus in-memory fallback so app runs without AWS credentials.
+---
 
-🛣️ Roadmap (next priorities)
+## Testing
 
-Planned improvements and features:
+Backend unit tests
 
-- Short term
-  - Quizzes & in-app practice tests with result recording (DynamoDB + analytics) ✅ (scaffolded)
-  - Improve RAG prompts & citation formatting
-  - Role-based access & real Cognito integration
+```bash
+# recommended: from repo root
+make backend-test
+# or
+cd backend
+pytest -q
+```
 
-- Medium term
-  - Group study / shared flashcards and collaborative sessions
-  - Fine-grained ingestion (slide-level metadata, OCR improvements)
-  - Better frontend UX: mobile responsiveness, saved sessions, export
+Frontend tests
 
-- Long term
-  - Automated syllabus mapping, course analytics, recommended study plans
-  - Production-grade observability, quotas, and cost controls for LLM usage
+```bash
+cd frontend
+# if tests are present
+npm test
+```
 
-🤝 Contributing
+CI/CD
 
-Thank you for your interest! We welcome small, focused PRs with tests and changelog notes. Before opening a PR:
+- GitHub Actions workflows run on PRs and pushes. Example workflows:
+  - .github/workflows/preview-test.yml — runs backend tests, builds frontend, uploads artifacts.
+  - .github/workflows/preview-aws.yml — optional: provisions preview infra (Terraform) for PRs.
 
-- Run backend and frontend tests locally.
-- If touching infra, include `terraform plan` output and mark PRs clearly.
-- Follow the contributor guidance in CONTRIBUTING.md: ./CONTRIBUTING.md
+Workflows are configured to publish badges in this README — update the OWNER/REPO/BRANCH placeholders above to have valid badge links.
 
-If you plan to work on a bigger change, open an Issue first to align on design.
+---
 
-📜 License
+## Reference — quick links
 
-This repository is provided under the MIT license. Replace this placeholder with your chosen license as needed.
+- Developer docs portal: {{ docs_url }}
+- Backend entrypoint: backend/app/main.py
+- Ingest CLI: backend/app/ingest.py
+- Auth helpers (mock + Cognito): backend/app/auth.py
+- DB fallback store: backend/app/db.py
+- Frontend: frontend/ (Next.js)
+- RAG pipeline overview (docs): {{ docs_url }}/rag.md
+- Operations / Runbooks: {{ docs_url }}/runbooks.md
+- Testing docs: {{ docs_url }}/testing.md
+- CONTRIBUTING guide: ./CONTRIBUTING.md
+- Changelog: {{ docs_url }}/changelog.md
 
-----
+Note: replace {{ docs_url }} with your MkDocs Material site URL (or local docs path if serving docs with mkdocs serve).
 
-If anything is unclear while setting up locally, open an Issue with your OS, error logs and the step that failed and maintainers will help. Happy building! 🎓✨
+---
+
+## Roadmap
+
+- ✅ Implemented: MVP scaffold — ingestion CLI, chunking & embedding stubs, FastAPI RAG skeleton, minimal Next.js UI, mock auth.
+
+Short / Medium term (🔜):
+
+- Improve RAG prompts and citation formatting
+- Add role-based Cognito integration and RBAC
+- Add quizzes & practice tests with analytics (DynamoDB)
+- Improve ingestion granularity (slide-level metadata)
+
+Long term (📈):
+
+- Fine-grained observability, quotas & cost controls for LLM usage
+- Automated syllabus mapping and personalized study plans
+- Collaborative features: shared flashcards, study groups
+
+Full changelog & roadmap: {{ docs_url }}/changelog.md
+
+---
+
+## Contributing
+
+We welcome contributions. Quick guidance:
+
+- Small PRs are preferred: 1 feature/fix per PR with tests and changelog note.
+- For large design changes, open an Issue first to align on architecture and scope.
+- If you touch infra, include terraform plan output and mark PRs with the infra label.
+
+See ./CONTRIBUTING.md for the full contributor workflow and local dev tips.
+
+PR checklist (suggested):
+
+- [ ] Ran `mkdocs serve` locally to confirm docs references
+- [ ] Verified workflow badges resolve (update OWNER/REPO placeholders)
+- [ ] Verified paths referenced in README exist (backend/, frontend/, infra/)
+- [ ] Ran `markdownlint README.md` (or your preferred markdown linter)
+
+---
+
+## License
+
+This repository is distributed under the MIT License. Replace or update the LICENSE file if your project uses a different license.
+
+---
+
+## Where to go next
+
+For more, see the full Developer Docs » {{ docs_url }}
+
+If you hit problems while setting up, open an Issue with the OS, error logs, and the step that failed — maintainers will help. Thank you for contributing to EduRAG.
