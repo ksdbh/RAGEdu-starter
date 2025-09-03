@@ -24,34 +24,22 @@ How it works (high level):
 
 ## Architecture (data flow)
 
+## Architecture (data flow)
+
 ```mermaid
 flowchart LR
 
-  subgraph Ingestion
-    S3[S3: uploaded PDFs / documents]
-    Textract[Amazon Textract / PDF parser]
-    Chunking[Semantic chunking & metadata]
-    Embedding[Embeddings: Bedrock / OpenAI / stub]
-    S3 --> Textract --> Chunking --> Embedding
-  end
+  %% Ingestion
+  S3[S3: uploaded PDFs / documents] --> Textract[Amazon Textract / PDF parser]
+  Textract --> Chunking[Semantic chunking & metadata]
+  Chunking --> Embedding[Embeddings: Bedrock / OpenAI / stub]
+  Embedding --> OpenSearch[OpenSearch: vector index / stub]
 
-  subgraph Retrieval_and_Answering
-    OpenSearch[OpenSearch: vector index / stub]
-    FastAPI[FastAPI: backend/app/main.py]
-    LLM[LLM: Bedrock / OpenAI / stub]
-    NextJS[Next.js frontend]
-  end
-
-  Embedding --> OpenSearch
-  NextJS <--> FastAPI
+  %% Retrieval
+  NextJS[Next.js frontend] <--> FastAPI[FastAPI: backend/app/main.py]
   FastAPI --> OpenSearch
-  FastAPI --> LLM
+  FastAPI --> LLM[LLM: Bedrock / OpenAI / stub]
   LLM --> FastAPI
-
-  %% Optional styling (GitHub supports basic Mermaid styling)
-  classDef aws fill:#eef2ff,stroke:#4338ca,color:#111827
-  class S3,Textract aws
-
 
 ---
 
