@@ -1,7 +1,7 @@
 # EduRAG — AI study companion grounded in your course content
 
-[![CI](https://github.com/<OWNER>/<REPO>/actions/workflows/preview-test.yml/badge.svg?branch=main)](https://github.com/<OWNER>/<REPO>/actions/workflows/preview-test.yml)
-[![Docs]({{ docs_url }}/assets/badge.svg)]({{ docs_url }})
+[![CI](https://github.com/ksdbh/RAGEdu-starter/actions/workflows/preview-test.yml/badge.svg?branch=main)](https://github.com/ksdbh/RAGEdu-starter/actions/workflows/preview-test.yml)
+[![Docs](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://ksdbh.github.io/RAGEdu-starter/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 Tagline: EduRAG — a Retrieval-Augmented Generation scaffold that answers student questions with citations from course materials.
@@ -24,21 +24,35 @@ How it works (high level):
 
 ## Architecture (data flow)
 
+### Checklist to avoid this error
+- Make sure the **closing** triple backticks of the mermaid block are present and on their own line.
+- Add a **blank line after** the closing backticks before the next heading.
+- Keep **all mermaid styling/`classDef` lines inside** the mermaid code fence (or omit styling).
+- Use mermaid edge arrows like `-->` (don’t put `---` outside a mermaid block).
+
+If you want a slightly styled version (optional), this also renders fine:
+
 ```mermaid
 flowchart LR
-  S3[S3 (uploaded PDFs / documents)] --> Textract[Amazon Textract / PDF parser]
+
+  %% Ingestion
+  S3[S3: uploaded PDFs / documents] --> Textract[Textract / PDF parser]
   Textract --> Chunking[Semantic chunking & metadata]
-  Chunking --> Embedding[Embedding service (Bedrock / OpenAI / stub)]
-  Embedding --> OpenSearch[OpenSearch (vector index) / stub]
-  OpenSearch --> FastAPI[FastAPI (backend/app/main.py)]
-  FastAPI --> LLM[LLM (Bedrock / OpenAI / stub)]
+  Chunking --> Embedding[Embeddings: Bedrock / OpenAI / stub]
+  Embedding --> OpenSearch[OpenSearch: vector index / stub]
+
+  %% Retrieval
+  NextJS[Next.js frontend] <--> FastAPI[FastAPI: backend/app/main.py]
+  FastAPI --> OpenSearch
+  FastAPI --> LLM[LLM: Bedrock / OpenAI / stub]
   LLM --> FastAPI
-  FastAPI --> NextJS[Next.js frontend (frontend/)]
 
-  classDef aws fill:#f3f4f6,stroke:#111827
-  class S3,Textract aws
+  %% Minimal styling
+  classDef aws fill:#eef2ff,stroke:#4338ca,stroke-width:1px,color:#111;
+  classDef app fill:#f8fafc,stroke:#111827,stroke-width:1px,color:#111;
+  class S3,Textract,OpenSearch aws;
+  class NextJS,FastAPI,LLM,Chunking,Embedding app;
 ```
-
 ---
 
 ## Getting started (local developer onboarding)
@@ -223,6 +237,6 @@ This repository is distributed under the MIT License. Replace or update the LICE
 
 ## Where to go next
 
-For more, see the full Developer Docs » {{ docs_url }}
+For more, see the full Developer Docs » [![Docs](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://ksdbh.github.io/RAGEdu-starter/)
 
 If you hit problems while setting up, open an Issue with the OS, error logs, and the step that failed — maintainers will help. Thank you for contributing to EduRAG.
