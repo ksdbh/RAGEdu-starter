@@ -32,9 +32,6 @@ How it works (high level):
 
 If you want a slightly styled version (optional), this also renders fine:
 
-```markdown
-## Architecture (data flow)
-
 ```mermaid
 flowchart LR
 
@@ -55,8 +52,6 @@ flowchart LR
   classDef app fill:#f8fafc,stroke:#111827,stroke-width:1px,color:#111;
   class S3,Textract,OpenSearch aws;
   class NextJS,FastAPI,LLM,Chunking,Embedding app;
-
-```
 ```
 ---
 
