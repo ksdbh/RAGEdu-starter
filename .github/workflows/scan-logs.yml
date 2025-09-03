@@ -16,6 +16,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install OpenAI SDK
+        run: |
+          npm init -y
+          npm install openai
+
       - name: Fetch recent logs (optional)
         run: |
           mkdir -p logs
@@ -65,7 +75,7 @@ jobs:
 
           const resp = await withRetry(() =>
             openai.chat.completions.create({
-              model: "gpt-5-mini",     // no temperature param for gpt-5 family
+              model: "gpt-4o-mini",  // use a widely available small model
               messages: [
                 { role: "system", content: "Return only Markdown." },
                 { role: "user", content: prompt }
