@@ -1,7 +1,7 @@
 site_name: EduRAG — Developer Docs
 site_description: EduRAG — AI study companion grounded in course content (developer docs)
-site_url: https://your-org.github.io/edurag
-repo_url: https://github.com/your-org/your-repo
+site_url: https://ksdbh.github.io/RAGEdu-starter
+repo_url: https://github.com/ksdbh/RAGEdu-starter
 
 theme:
   name: material
@@ -62,4 +62,4 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/your-org/your-repo
+      link: https://github.com/ksdbh/RAGEdu-starter
