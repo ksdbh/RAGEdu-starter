@@ -237,6 +237,6 @@ This repository is distributed under the MIT License. Replace or update the LICE
 
 ## Where to go next
 
-For more, see the full Developer Docs » {{ docs_url }}
+For more, see the full Developer Docs » [![Docs](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://ksdbh.github.io/RAGEdu-starter/)
 
 If you hit problems while setting up, open an Issue with the OS, error logs, and the step that failed — maintainers will help. Thank you for contributing to EduRAG.
