@@ -57,7 +57,7 @@ flowchart LR
   class NextJS,FastAPI,LLM,Chunking,Embedding app;
 
 ```
-
+```
 ---
 
 ## Getting started (local developer onboarding)
