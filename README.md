@@ -24,13 +24,22 @@ How it works (high level):
 
 ## Architecture (data flow)
 
+### Checklist to avoid this error
+- Make sure the **closing** triple backticks of the mermaid block are present and on their own line.
+- Add a **blank line after** the closing backticks before the next heading.
+- Keep **all mermaid styling/`classDef` lines inside** the mermaid code fence (or omit styling).
+- Use mermaid edge arrows like `-->` (don’t put `---` outside a mermaid block).
+
+If you want a slightly styled version (optional), this also renders fine:
+
+```markdown
 ## Architecture (data flow)
 
 ```mermaid
 flowchart LR
 
   %% Ingestion
-  S3[S3: uploaded PDFs / documents] --> Textract[Amazon Textract / PDF parser]
+  S3[S3: uploaded PDFs / documents] --> Textract[Textract / PDF parser]
   Textract --> Chunking[Semantic chunking & metadata]
   Chunking --> Embedding[Embeddings: Bedrock / OpenAI / stub]
   Embedding --> OpenSearch[OpenSearch: vector index / stub]
@@ -40,6 +49,14 @@ flowchart LR
   FastAPI --> OpenSearch
   FastAPI --> LLM[LLM: Bedrock / OpenAI / stub]
   LLM --> FastAPI
+
+  %% Minimal styling
+  classDef aws fill:#eef2ff,stroke:#4338ca,stroke-width:1px,color:#111;
+  classDef app fill:#f8fafc,stroke:#111827,stroke-width:1px,color:#111;
+  class S3,Textract,OpenSearch aws;
+  class NextJS,FastAPI,LLM,Chunking,Embedding app;
+
+```
 
 ---
 
