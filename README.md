@@ -36,10 +36,10 @@ flowchart LR
   end
 
   subgraph Retrieval_and_Answering
-    OpenSearch[OpenSearch vector index / stub]
-    FastAPI[FastAPI (backend/app/main.py)]
+    OpenSearch[OpenSearch: vector index / stub]
+    FastAPI[FastAPI: backend/app/main.py]
     LLM[LLM: Bedrock / OpenAI / stub]
-    NextJS[Next.js frontend (frontend/)]
+    NextJS[Next.js frontend]
   end
 
   Embedding --> OpenSearch
