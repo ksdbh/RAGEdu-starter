@@ -1,7 +1,7 @@
 # EduRAG — AI study companion grounded in your course content
 
-[![CI](https://github.com/<OWNER>/<REPO>/actions/workflows/preview-test.yml/badge.svg?branch=main)](https://github.com/<OWNER>/<REPO>/actions/workflows/preview-test.yml)
-[![Docs](https://ksdbh.github.io/RAGEdu-starter/)](https://ksdbh.github.io/RAGEdu-starter/)
+[![CI](https://github.com/ksdbh/RAGEdu-starter/actions/workflows/preview-test.yml/badge.svg?branch=main)](https://github.com/ksdbh/RAGEdu-starter/actions/workflows/preview-test.yml)
+[![Docs](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://ksdbh.github.io/RAGEdu-starter/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 Tagline: EduRAG — a Retrieval-Augmented Generation scaffold that answers student questions with citations from course materials.
