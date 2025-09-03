@@ -28,17 +28,17 @@ How it works (high level):
 flowchart LR
 
   subgraph Ingestion
-    S3[S3 (uploaded PDFs / documents)]
+    S3[S3: uploaded PDFs / documents]
     Textract[Amazon Textract / PDF parser]
     Chunking[Semantic chunking & metadata]
-    Embedding[Embeddings (Bedrock / OpenAI / stub)]
+    Embedding[Embeddings: Bedrock / OpenAI / stub]
     S3 --> Textract --> Chunking --> Embedding
   end
 
-  subgraph Retrieval & Answering
-    OpenSearch[(OpenSearch (vector index) / stub)]
+  subgraph Retrieval_and_Answering
+    OpenSearch[OpenSearch vector index / stub]
     FastAPI[FastAPI (backend/app/main.py)]
-    LLM[LLM (Bedrock / OpenAI / stub)]
+    LLM[LLM: Bedrock / OpenAI / stub]
     NextJS[Next.js frontend (frontend/)]
   end
 
