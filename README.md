@@ -26,18 +26,32 @@ How it works (high level):
 
 ```mermaid
 flowchart LR
-  S3[S3 (uploaded PDFs / documents)] --> Textract[Amazon Textract / PDF parser]
-  Textract --> Chunking[Semantic chunking & metadata]
-  Chunking --> Embedding[Embedding service (Bedrock / OpenAI / stub)]
-  Embedding --> OpenSearch[OpenSearch (vector index) / stub]
-  OpenSearch --> FastAPI[FastAPI (backend/app/main.py)]
-  FastAPI --> LLM[LLM (Bedrock / OpenAI / stub)]
-  LLM --> FastAPI
-  FastAPI --> NextJS[Next.js frontend (frontend/)]
 
-  classDef aws fill:#f3f4f6,stroke:#111827
+  subgraph Ingestion
+    S3[S3 (uploaded PDFs / documents)]
+    Textract[Amazon Textract / PDF parser]
+    Chunking[Semantic chunking & metadata]
+    Embedding[Embeddings (Bedrock / OpenAI / stub)]
+    S3 --> Textract --> Chunking --> Embedding
+  end
+
+  subgraph Retrieval & Answering
+    OpenSearch[(OpenSearch (vector index) / stub)]
+    FastAPI[FastAPI (backend/app/main.py)]
+    LLM[LLM (Bedrock / OpenAI / stub)]
+    NextJS[Next.js frontend (frontend/)]
+  end
+
+  Embedding --> OpenSearch
+  NextJS <--> FastAPI
+  FastAPI --> OpenSearch
+  FastAPI --> LLM
+  LLM --> FastAPI
+
+  %% Optional styling (GitHub supports basic Mermaid styling)
+  classDef aws fill:#eef2ff,stroke:#4338ca,color:#111827
   class S3,Textract aws
-```
+
 
 ---
 
