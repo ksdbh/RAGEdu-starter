@@ -11,10 +11,9 @@ on:
         default: ''
 
 permissions:
-  contents: write         # needed if assistant pushes branches
-  pull-requests: write
-  issues: write
-  workflows: write        # only required if you want it to modify workflow files
+  contents: write         # needed to push branches/commits
+  pull-requests: write    # needed to open/update PRs
+  issues: write           # reply to issue comments, etc.
 
 jobs:
   run-assistant:
@@ -39,12 +38,12 @@ jobs:
 
       - name: Run assistant
         env:
-          # Preferred: a PAT with repo scope so the bot can open PRs & edit workflows
+          # Preferred: Personal Access Token (repo scope) if you want to edit workflows or auto-merge
           GH_AUTOMERGE_PAT: ${{ secrets.GH_AUTOMERGE_PAT }}
-          # Fallback for GitHub API calls if PAT not set
+          # Fallback token for standard repo operations
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # OpenAI key for planning edits
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          # Optional: support manual dispatch input
+          # Optional: support manual dispatch commands
           DISPATCH_CMD: ${{ inputs.DISPATCH_CMD }}
         run: node .github/assistant.mjs
