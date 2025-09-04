@@ -6,14 +6,14 @@ on:
   workflow_dispatch:
     inputs:
       cmd:
-        description: "Optional command to run (e.g., /gen Add README)"
+        description: "Optional command to run (e.g., /gen docs:full)"
         required: false
         default: ""
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+  contents: write        # push branches/commits
+  pull-requests: write   # open/update PRs
+  issues: write          # comment on issues/PRs
 
 jobs:
   run:
@@ -27,21 +27,25 @@ jobs:
                                                    startsWith(github.event.comment.body, '/scaffold')))
     runs-on: ubuntu-latest
     env:
-      GH_AUTOMERGE_PAT: ${{ secrets.GH_AUTOMERGE_PAT }}
+      GH_AUTOMERGE_PAT: ${{ secrets.GH_AUTOMERGE_PAT }}   # optional PAT if you want to edit workflows / auto-merge
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       DISPATCH_CMD: ${{ github.event.inputs.cmd }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          persist-credentials: false  # we push with PAT from the script
+          persist-credentials: false
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
-      - name: Install deps
+      # We intentionally do NOT use `npm ci` because we don't commit a lockfile for this tiny helper.
+      - name: Install deps for assistant
         run: |
           npm init -y
           npm i openai@4 octokit @actions/github
