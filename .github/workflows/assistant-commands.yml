@@ -43,6 +43,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: .github/package-lock.json
 
       # We intentionally do NOT use `npm ci` because we don't commit a lockfile for this tiny helper.
       - name: Install deps for assistant
@@ -51,4 +52,5 @@ jobs:
           npm i openai@4 octokit @actions/github
 
       - name: Run assistant
-        run: node .github/assistant.mjs
++        working-directory: .github
++        run: node assistant.mjs

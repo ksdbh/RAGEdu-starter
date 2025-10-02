@@ -1,0 +1,13 @@
+{
+    "name": "ci-assistant",
+    "private": true,
+    "type": "module",
+    "dependencies": {
+      "@actions/github": "^6.0.0",
+      "octokit": "^4.0.0",
+      "openai": "^4.0.0"
+    },
+    "scripts": {
+      "start": "node assistant.mjs"
+    }
+  }
