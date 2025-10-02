@@ -11,23 +11,22 @@ on:
         default: ""
 
 permissions:
-  contents: write        # push branches/commits
-  pull-requests: write   # open/update PRs
-  issues: write          # comment on issues/PRs
+  contents: write
+  pull-requests: write
+  issues: write
 
 jobs:
   run:
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.issue.pull_request != null && (startsWith(github.event.comment.body, '/gen') ||
-                                                   startsWith(github.event.comment.body, '/fix') ||
-                                                   startsWith(github.event.comment.body, '/scaffold'))) ||
-      (github.event.issue.pull_request == null && (startsWith(github.event.comment.body, '/gen') ||
-                                                   startsWith(github.event.comment.body, '/fix') ||
-                                                   startsWith(github.event.comment.body, '/scaffold')))
+    if: github.event_name == 'workflow_dispatch' ||
+        (github.event.issue.pull_request != null && (startsWith(github.event.comment.body, '/gen') ||
+                                                     startsWith(github.event.comment.body, '/fix') ||
+                                                     startsWith(github.event.comment.body, '/scaffold'))) ||
+        (github.event.issue.pull_request == null && (startsWith(github.event.comment.body, '/gen') ||
+                                                     startsWith(github.event.comment.body, '/fix') ||
+                                                     startsWith(github.event.comment.body, '/scaffold')))
     runs-on: ubuntu-latest
     env:
-      GH_AUTOMERGE_PAT: ${{ secrets.GH_AUTOMERGE_PAT }}   # optional PAT if you want to edit workflows / auto-merge
+      GH_AUTOMERGE_PAT: ${{ secrets.GH_AUTOMERGE_PAT }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       DISPATCH_CMD: ${{ github.event.inputs.cmd }}
@@ -41,16 +40,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
           cache: npm
           cache-dependency-path: .github/package-lock.json
 
-      # We intentionally do NOT use `npm ci` because we don't commit a lockfile for this tiny helper.
       - name: Install deps for assistant
-        run: |
-          npm init -y
-          npm i openai@4 octokit @actions/github
+        working-directory: .github
+        run: npm ci --no-fund --no-audit
 
       - name: Run assistant
-          working-directory: .github
-          run: node assistant.mjs
+        working-directory: .github
+        run: node assistant.mjs
