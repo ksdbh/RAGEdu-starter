@@ -52,5 +52,5 @@ jobs:
           npm i openai@4 octokit @actions/github
 
       - name: Run assistant
-+        working-directory: .github
-+        run: node assistant.mjs
+          working-directory: .github
+          run: node assistant.mjs
