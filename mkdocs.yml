@@ -6,15 +6,32 @@ repo_url: https://github.com/ksdbh/RAGEdu-starter
 theme:
   name: material
   language: en
+  palette:
+    - scheme: slate
+      primary: cyan
+      accent: purple
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - scheme: default
+      primary: cyan
+      accent: purple
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
   features:
     - navigation.instant
     - navigation.tabs
+    - navigation.top
     - search.highlight
     - content.code.copy
+    - content.tabs.link
 
 markdown_extensions:
   - admonition
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
   - toc:
       permalink: true
 
@@ -23,6 +40,7 @@ plugins:
 
 nav:
   - Home: index.md
+  - Platform tour: platform-tour.md
   - Getting Started:
       - Quick Start: getting-started.md
       - Project structure: project-structure.md
