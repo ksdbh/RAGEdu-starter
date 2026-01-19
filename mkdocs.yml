@@ -21,8 +21,7 @@ theme:
         name: Switch to dark mode
   features:
     - navigation.instant
-    - navigation.tabs
-    - navigation.top
+    - navigation.expand
     - search.highlight
     - content.code.copy
     - content.tabs.link
@@ -40,44 +39,61 @@ plugins:
 
 nav:
   - Home: index.md
-  - Platform tour: platform-tour.md
+  - Overview:
+      - Platform tour: platform-tour.md
+      - FAQ: faq.md
   - Getting Started:
-      - Quick Start: getting-started.md
+      - Quickstart: getting-started.md
+      - Local sandbox (detailed): getting-started-local.md
+      - Docker & Compose: getting-started-docker.md
+      - Devcontainer setup: getting-started-devcontainer.md
       - Project structure: project-structure.md
-      - Environments: environments.md
-      - Deployment: deployment.md
   - Concepts:
       - Architecture: architecture.md
-      - RAG Overview: rag/overview.md
+      - RAG overview: rag/overview.md
+      - Guardrails: guardrails.md
       - Ingestion: rag/ingestion.md
       - Chunking: rag/chunking.md
       - Embeddings: rag/embeddings.md
       - Retrieval: rag/retrieval.md
-      - Guardrails: rag/guardrails.md
-  - Tutorials:
-      - (placeholder) Create an index: changelog.md
-  - Reference:
-      - Backend endpoints: backend/endpoints.md
+  - Guides:
+      - Add a new course: guides/add-course.md
+      - Wire a real LLM provider: guides/real-llm.md
+      - Switch vector store: guides/vector-store.md
+  - Backend:
+      - Backend summary: backend.md
+      - Endpoints catalog: backend/endpoints.md
       - Data models: backend/data-models.md
+      - Auth & identity: backend/auth.md
+      - RAG API: backend/rag-api.md
+      - Quiz API: backend/quiz-api.md
+  - Operations:
+      - Overview: ops.md
+      - Environments: environments.md
+      - Deployment: deployment.md
+      - Monitoring: operations/monitoring.md
+      - Runbooks: operations/runbooks.md
+      - Troubleshooting: operations/troubleshooting.md
+  - Reference:
       - AWS Integrations: aws/integrations.md
       - AWS IAM guidance: aws/iam.md
-  - Operations:
-      - Runbooks: operations/runbooks.md
-      - Monitoring: operations/monitoring.md
-      - Troubleshooting: operations/troubleshooting.md
-  - Security: security.md
+      - Security: security.md
+      - Changelog: changelog.md
+      - Glossary: glossary.md
   - Testing:
       - Overview: testing/overview.md
       - How to run tests: testing/how-to-run.md
       - Test conventions: testing/test-conventions.md
+      - Testing contracts: testing.md
   - Assistant:
+      - For assistant bots: assistant.md
       - How the assistant uses docs: assistant/how-it-uses-docs.md
   - Troubleshooting: gotchas.md
-  - FAQ: faq.md
-  - Glossary: glossary.md
-  - Changelog: changelog.md
 
 extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/ksdbh/RAGEdu-starter
+
+extra_css:
+  - assets/overrides.css

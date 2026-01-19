@@ -1,6 +1,18 @@
 # Getting Started — run EduRAG locally
 
-This page walks you from a fresh clone to “first answer with citations” as quickly as possible.
+<div class="hero-card">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">Quickstart</p>
+    <p class="hero-title">From clone to
+      <span class="bubble"><span class="bubble-dot"></span>first answer with citations</span>
+      in minutes.
+    </p>
+    <p class="hero-tagline">
+      Choose the setup path that fits your workflow: local sandbox, Makefile
+      helpers, or a full Docker Compose stack that mirrors CI.
+    </p>
+  </div>
+</div>
 
 ## Prerequisites
 

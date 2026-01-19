@@ -1,6 +1,18 @@
 # Platform tour — EduRAG in plain language
 
-This page is a guided tour of EduRAG for people who are new to the platform and to RAG-style systems.
+<div class="hero-card">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">Guided tour</p>
+    <p class="hero-title">
+      See how a PDF turns into an
+      <span class="bubble"><span class="bubble-dot"></span>answer with citations</span>.
+    </p>
+    <p class="hero-tagline">
+      This tour walks through the ingestion and query flows in plain language,
+      so you can understand EduRAG even if you are new to RAG systems.
+    </p>
+  </div>
+</div>
 
 By the end you should understand what EduRAG does, how a document becomes an answer with citations, and where to look next in the docs.
 
@@ -12,63 +24,79 @@ EduRAG ingests your course materials (slides, PDFs, syllabi), breaks them into s
 
 Let’s follow a lecture PDF end to end.
 
-1. **Upload**
-   - You place the PDF in a storage location (S3 or local) or point the ingest CLI at it.
-2. **Extract text**
-   - A parser or Textract reads the PDF and emits text per page.
-3. **Chunk and label**
-   - EduRAG runs the text through a chunker that:
-     - Cleans up whitespace.
-     - Splits pages into smaller sections.
-     - Adds metadata like `course_id`, `page`, and a guessed `section` title.
-4. **Embed**
-   - Each chunk is converted into a numeric vector (an embedding) using a stub or real embedding model.
-5. **Index**
-   - Vectors and metadata are stored in OpenSearch so they can be retrieved by similarity later.
+<div class="step-grid">
+  <div class="step-card">
+    <div class="step-label">Step 1</div>
+    <div class="step-title">Upload</div>
+    <p>You place the PDF in a storage location (S3 or local) or point the
+    ingest CLI at it.</p>
+  </div>
+  <div class="step-card">
+    <div class="step-label">Step 2</div>
+    <div class="step-title">Extract text</div>
+    <p>A parser or Textract reads the PDF and emits text per page, giving us a
+    clean text representation to work with.</p>
+  </div>
+  <div class="step-card">
+    <div class="step-label">Step 3</div>
+    <div class="step-title">Chunk and label</div>
+    <p>EduRAG runs the text through a chunker that cleans whitespace, splits
+    into smaller sections, and adds metadata like <code>course_id</code>,
+    <code>page</code>, and a guessed <code>section</code> title.</p>
+  </div>
+  <div class="step-card">
+    <div class="step-label">Step 4</div>
+    <div class="step-title">Embed &amp; index</div>
+    <p>Each chunk is converted into a numeric vector (an embedding) using a
+    stub or real embedding model, then stored with metadata in OpenSearch so
+    it can be retrieved by similarity later.</p>
+  </div>
+</div>
 
-All of this logic is implemented in `backend/app/ingest.py`. See [Ingestion](rag/ingestion.md) and [Chunking](rag/chunking.md) for more detail.
+All of this logic is implemented in <code>backend/app/ingest.py</code>. See
+[Ingestion](rag/ingestion.md) and [Chunking](rag/chunking.md) for more detail.
 
 ## 3. What happens when I ask a question?
 
 Now imagine a student asks: “What topics are covered on Exam 1?”
 
-1. **Question arrives**
-   - The frontend sends a POST request to `/rag/answer` with a JSON body like:
+<div class="step-grid">
+  <div class="step-card">
+    <div class="step-label">Step 1</div>
+    <div class="step-title">Question arrives</div>
+    <p>The frontend sends a POST request to <code>/rag/answer</code> with a JSON
+    body like <code>{"query": "What topics are covered on Exam 1?", "top_k": 5}</code>.</p>
+  </div>
+  <div class="step-card">
+    <div class="step-label">Step 2</div>
+    <div class="step-title">Search for context</div>
+    <p>A search client (stub or OpenSearch) finds the top-k chunks that best
+    match the question. Each chunk has a score and metadata (title, page,
+    snippet).</p>
+  </div>
+  <div class="step-card">
+    <div class="step-label">Step 3</div>
+    <div class="step-title">Guardrail check</div>
+    <p>The
+    <span class="bubble"><span class="bubble-dot"></span>guardrail</span>
+    in <code>answer_query</code> looks at the highest score. If it is below a
+    threshold (<code>min_similarity</code>), it <strong>does not</strong> call
+    the LLM and instead returns a "need more sources" answer so the UI can
+    prompt the user to add or refine content.</p>
+  </div>
+  <div class="step-card">
+    <div class="step-label">Step 4</div>
+    <div class="step-title">Prompt, LLM, and citations</div>
+    <p>If scores are good, the backend constructs a grounded prompt (with a
+    <code>Sources:</code> section), calls the LLM (stub or real), and returns an
+    answer plus a list of citations with <code>{ title, page, snippet, score }</code>
+    and a <code>metadata</code> object including <code>top_k</code>,
+    <code>course_id</code>, and <code>confidence</code>.</p>
+  </div>
+</div>
 
-     ```json
-     {
-       "query": "What topics are covered on Exam 1?",
-       "top_k": 5
-     }
-     ```
-
-2. **Search for context**
-   - A search client (stub or OpenSearch) finds the top-k chunks that best match the question.
-   - Each chunk has a score and metadata (title, page, snippet).
-
-3. **Guardrail check**
-   - The RAG helper (`answer_query` in `backend/app/rag.py`) looks at the highest score.
-   - If it is below a threshold (`min_similarity`), it **does not** call the LLM.
-   - Instead, it returns a “need more sources” answer so the UI can prompt the user to add or refine content.
-
-4. **Prompt building**
-   - If the scores are good, the backend constructs a prompt that contains:
-     - A short instruction.
-     - Bullet points of the retrieved snippets.
-     - The question.
-     - A `Sources:` cue so the LLM knows to respect the retrieved context.
-
-5. **LLM call**
-   - In local dev, a deterministic stub LLM returns a test-friendly answer.
-   - In production you can replace this with a real provider (OpenAI/Bedrock) behind the same interface.
-
-6. **Answer and citations**
-   - The backend returns:
-     - An `answer` string that starts with `"ANSWER based on"`.
-     - A list of `citations` with `{ title, page, snippet, score }`.
-     - A small `metadata` object with `top_k`, `course_id`, and `confidence`.
-
-See [RAG Overview](rag/overview.md) and [RAG Pipeline](rag.md) for the exact behavior and contracts.
+See [RAG Overview](rag/overview.md) and [RAG Pipeline](rag.md) for the exact
+behavior and contracts.
 
 ## 4. How different people use EduRAG
 

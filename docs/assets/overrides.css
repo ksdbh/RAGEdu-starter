@@ -1,0 +1,264 @@
+:root {
+  /* Soft card/bubble styling tuned for dark + light palettes */
+  --edu-card-radius: 18px;
+  --edu-card-border: rgba(148, 163, 184, 0.35);
+  --edu-card-bg: rgba(15, 23, 42, 0.86);
+  --edu-card-bg-soft: radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 55%),
+                      radial-gradient(circle at bottom right, rgba(129, 140, 248, 0.16), transparent 55%),
+                      rgba(15, 23, 42, 0.95);
+  --edu-hero-shadow: 0 22px 45px rgba(15, 23, 42, 0.8);
+  --edu-pill-bg: rgba(15, 23, 42, 0.9);
+  --edu-pill-border: rgba(148, 163, 184, 0.45);
+}
+
+/* Adjust cards in light mode using Material's default scheme */
+[data-md-color-scheme="default"] {
+  --edu-card-bg: rgba(255, 255, 255, 0.96);
+  --edu-card-bg-soft: radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 55%),
+                      radial-gradient(circle at bottom right, rgba(196, 181, 253, 0.16), transparent 55%),
+                      rgba(255, 255, 255, 0.98);
+  --edu-hero-shadow: 0 18px 35px rgba(15, 23, 42, 0.22);
+  --edu-pill-bg: rgba(255, 255, 255, 0.96);
+  --edu-pill-border: rgba(148, 163, 184, 0.35);
+}
+
+/* HERO CARD -------------------------------------------------------------- */
+
+.md-typeset .hero-card {
+  margin: 0 0 1.5rem;
+  padding: 1.3rem 1.5rem 1.4rem;
+  border-radius: var(--edu-card-radius);
+  border: 1px solid var(--edu-card-border);
+  background: var(--edu-card-bg-soft);
+  box-shadow: var(--edu-hero-shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.md-typeset .hero-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.18), transparent 60%),
+              radial-gradient(circle at 100% 0%, rgba(129, 140, 248, 0.22), transparent 60%);
+  opacity: 0.4;
+}
+
+.md-typeset .hero-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.md-typeset .hero-eyebrow {
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin: 0 0 0.35rem;
+  color: var(--md-default-fg-color--light, rgba(148, 163, 184, 0.95));
+}
+
+.md-typeset .hero-title {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 0 0 0.4rem;
+}
+
+.md-typeset .hero-tagline {
+  margin: 0 0 0.9rem;
+  color: var(--md-default-fg-color--light, rgba(148, 163, 184, 0.95));
+}
+
+.md-typeset .hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.md-typeset .hero-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+  border: 1px solid rgba(56, 189, 248, 0.7);
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.18), rgba(129, 140, 248, 0.18));
+  color: inherit;
+}
+
+.md-typeset .hero-button:hover {
+  border-color: rgba(56, 189, 248, 0.95);
+  text-decoration: none;
+}
+
+.md-typeset .hero-button--secondary {
+  border-color: var(--edu-pill-border);
+  background: rgba(15, 23, 42, 0.7);
+}
+
+[data-md-color-scheme="default"] .md-typeset .hero-button--secondary {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* BUBBLES / PILLS -------------------------------------------------------- */
+
+.md-typeset .bubble {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.55rem;
+  margin: 0 0.05rem;
+  border-radius: 999px;
+  background: var(--edu-pill-bg);
+  border: 1px solid var(--edu-pill-border);
+  font-size: 0.8em;
+  white-space: nowrap;
+}
+
+.md-typeset .bubble-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  margin-right: 0.28rem;
+  background: #22c55e;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.9);
+}
+
+/* FEATURE GRID ----------------------------------------------------------- */
+
+.md-typeset .feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem;
+  margin: 0.9rem 0 1.5rem;
+}
+
+.md-typeset .feature-card {
+  padding: 0.9rem 1.05rem;
+  border-radius: 14px;
+  border: 1px solid var(--edu-card-border);
+  background: var(--edu-card-bg);
+}
+
+.md-typeset .feature-card h3 {
+  margin-top: 0;
+  margin-bottom: 0.3rem;
+  font-size: 0.98rem;
+}
+
+.md-typeset .feature-card p {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--md-default-fg-color--light, rgba(148, 163, 184, 0.96));
+}
+
+/* STEP GRID (for tours / flows) ----------------------------------------- */
+
+.md-typeset .step-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.9rem;
+  margin: 0.9rem 0 1.4rem;
+}
+
+.md-typeset .step-card {
+  padding: 0.8rem 1.0rem;
+  border-radius: 14px;
+  border: 1px solid var(--edu-card-border);
+  background: var(--md-default-bg-color);
+}
+
+.md-typeset .step-label {
+  font-size: 0.74rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--light, rgba(148, 163, 184, 0.95));
+  margin-bottom: 0.2rem;
+}
+
+.md-typeset .step-title {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+/* SIDEBAR NAV ----------------------------------------------------------- */
+
+/* Make primary sidebar nav feel more like a grouped, vertical menu */
+
+.md-sidebar--primary .md-nav--primary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+/* Top-level items (section headings like Overview, Getting Started, etc.) */
+.md-sidebar--primary .md-nav > .md-nav__list > .md-nav__item > .md-nav__link {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  padding: 0.25rem 0.75rem 0.2rem;
+  border-radius: 0.5rem;
+  color: var(--md-default-fg-color--light, rgba(148, 163, 184, 0.9));
+}
+
+/* Child links (actual doc pages) get pill styling */
+.md-sidebar--primary .md-nav__item .md-nav__list .md-nav__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.28rem 0.6rem;
+  padding-left: 1.0rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--md-default-fg-color--light, rgba(148, 163, 184, 0.9));
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+/* Base line is invisible until hover/active */
+.md-sidebar--primary .md-nav__item .md-nav__list .md-nav__link::before {
+  content: "";
+  position: absolute;
+  inset-block: 0.1rem;
+  left: 0.3rem;
+  width: 2px;
+  border-radius: 999px;
+  background-color: transparent;
+  transition: background-color 0.15s ease;
+}
+
+/* Hover state */
+.md-sidebar--primary .md-nav__item .md-nav__list .md-nav__link:hover {
+  background-color: rgba(148, 163, 184, 0.08);
+  color: var(--md-default-fg-color);
+  text-decoration: none;
+}
+
+.md-sidebar--primary .md-nav__item .md-nav__list .md-nav__link:hover::before {
+  background-color: rgba(56, 189, 248, 0.9);
+}
+
+/* Active (current page) state */
+.md-sidebar--primary .md-nav__item .md-nav__list .md-nav__link.md-nav__link--active {
+  background-color: rgba(56, 189, 248, 0.16);
+  color: var(--md-accent-fg-color, #22d3ee);
+}
+
+.md-sidebar--primary .md-nav__item .md-nav__list .md-nav__link.md-nav__link--active::before {
+  background-color: rgba(56, 189, 248, 0.9);
+}
+
+/* RESPONSIVE TWEAKS ----------------------------------------------------- */
+
+@media screen and (max-width: 720px) {
+  .md-typeset .hero-card {
+    padding: 1.0rem 1.0rem 1.1rem;
+  }
+
+  .md-typeset .hero-title {
+    font-size: 1.15rem;
+  }
+}

@@ -19,11 +19,15 @@ EduRAG’s RAG implementation focuses on:
 
 ## Guardrails
 
-EduRAG has a built-in guardrail in `backend/app/rag.py`:
+EduRAG has a built-in
+<span class="bubble"><span class="bubble-dot"></span>guardrail</span>
+in `backend/app/rag.py`:
 
-- Compute `top_sim = max(score)` over all retrieved docs.
-- If `top_sim < min_similarity`, do **not** call the LLM.
-- Instead, return a special answer code (`NEED_MORE_SOURCES`) and empty citations.
+- Compute <code>top_sim = max(score)</code> over all retrieved docs.
+- If <code>top_sim &lt; min_similarity</code>, do <strong>not</strong> call the LLM.
+- Instead, return a special answer code
+  <span class="bubble"><span class="bubble-dot"></span>NEED_MORE_SOURCES</span>
+  and empty citations.
 
 This behavior is enforced by tests and prevents wasting LLM calls on low-quality evidence.
 

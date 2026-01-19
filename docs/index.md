@@ -1,8 +1,23 @@
 # EduRAG — AI study companion grounded in your course content
 
-EduRAG is a Retrieval-Augmented Generation (RAG) study assistant: it ingests course materials (slides, PDFs, syllabi), indexes them semantically, and answers questions with citations back to the original content.
-
-This documentation site is the hub for understanding, running, and extending EduRAG.
+<div class="hero-card">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">RAG-powered study assistant</p>
+    <p class="hero-title">
+      Ask questions about your course content
+      <span class="bubble"><span class="bubble-dot"></span>with citations</span>
+    </p>
+    <p class="hero-tagline">
+      EduRAG ingests your slides, PDFs, and syllabi, then answers questions using
+      retrieved snippets from those documents so you can always trace answers back
+      to the source.
+    </p>
+    <div class="hero-actions">
+      <a class="hero-button" href="getting-started/">Run it locally</a>
+      <a class="hero-button hero-button--secondary" href="platform-tour/">Take the platform tour</a>
+    </div>
+  </div>
+</div>
 
 ## What is EduRAG?
 
@@ -55,10 +70,29 @@ You care about stability and observability:
 
 Typical workflows this scaffold supports:
 
-- **Ask questions with citations**: send a query to `/rag/answer` and receive an answer plus normalized citations (title, page, snippet, score).
-- **Generate quizzes**: use the `/quiz/generate` and `/quiz/submit` endpoints to build and grade simple quizzes.
-- **Ingest new courses quickly**: use the ingestion CLI to parse and chunk PDFs, compute embeddings, and index them into OpenSearch (or a stub).
-- **Integrate with your stack**: replace stubbed components (embeddings, LLM, auth, DB) with production-grade services behind clear interfaces.
+<div class="feature-grid">
+  <div class="feature-card">
+    <h3>Ask questions with citations</h3>
+    <p>Send a query to <code>/rag/answer</code> and receive an answer plus
+    normalized citations (title, page, snippet, score) drawn from your course
+    materials.</p>
+  </div>
+  <div class="feature-card">
+    <h3>Generate quizzes</h3>
+    <p>Use the quiz endpoints to generate and score lightweight quizzes
+    so students can quickly check their understanding of a topic.</p>
+  </div>
+  <div class="feature-card">
+    <h3>Ingest new courses quickly</h3>
+    <p>Point the ingest CLI at your PDFs to parse, chunk, embed, and index
+    them into OpenSearch (or a stub) with sensible metadata.</p>
+  </div>
+  <div class="feature-card">
+    <h3>Integrate with your stack</h3>
+    <p>Replace stubbed components (embeddings, LLM, auth, DB) with
+    production-grade services behind clear, test-backed interfaces.</p>
+  </div>
+</div>
 
 Each of these workflows is documented in more detail in the Getting Started, RAG, and Backend sections.
 
