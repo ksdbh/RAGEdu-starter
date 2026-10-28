@@ -1,5 +1,7 @@
 # Backend Endpoints
 
+> Updated 2026-10-28: consult the [current handoff](changelog.md) for verified implementation and commands. This older design/guidance page may describe disconnected or planned integrations. The active API uses demo clients, token-aware mock auth, one health schema, and no empty-evidence source fallback.
+
 The backend is a FastAPI application defined in `backend/app/main.py`. This page summarizes the key HTTP endpoints and how they are meant to be used.
 
 ## Health

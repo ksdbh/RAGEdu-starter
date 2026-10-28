@@ -1,5 +1,7 @@
 # Ingestion
 
+> Updated 2026-10-28: consult the [current handoff](../changelog.md) for verified implementation and commands. This older design/guidance page may describe disconnected or planned integrations. The active API uses demo clients, token-aware mock auth, one health schema, and no empty-evidence source fallback.
+
 Ingestion pipeline responsibilities
 
 1. Extract text from uploaded files (Textract or PDF parser).

@@ -1,5 +1,7 @@
 # Backend Endpoints — Reference
 
+> Updated 2026-10-28: consult the [current handoff](../changelog.md) for verified implementation and commands. This older design/guidance page may describe disconnected or planned integrations. The active API uses demo clients, token-aware mock auth, one health schema, and no empty-evidence source fallback.
+
 This reference lists the main backend HTTP endpoints and their contracts. Keep this document in sync with backend/app/main.py and backend/app/rag.py.
 
 Common headers

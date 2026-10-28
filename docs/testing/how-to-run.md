@@ -1,22 +1,21 @@
 # How to run tests
 
-Backend unit tests
+From repository root with backend production/development requirements installed:
 
-```bash
-cd backend
-pytest -q
+```sh
+python -m pytest -q
+# or: make backend-test
 ```
 
-Common targets
+Root `pytest.ini` establishes canonical `backend.app` imports. Request logs are isolated by pytest fixtures; tests do not delete developer log directories or call paid APIs.
 
-- make backend-test — convenience wrapper (calls pytest in backend/)
+From `frontend/`:
 
-CI tips
+```sh
+npm ci
+npm test
+npm run typecheck
+npm run build
+```
 
-- Tests should not rely on real AWS services. Use stubs or localstack for integration tests.
-
-Where to edit
-
-!!! info "Where to edit"
-    Source: docs/testing/how-to-run.md
-    Tests: backend/tests/
+With backend/frontend running, root `bash backend/scripts/e2e_smoke.sh` verifies FastAPI; `BASE_URL=http://localhost:3000/api/backend bash backend/scripts/e2e_smoke.sh` verifies the Next proxy. See the [handoff](../changelog.md) for results and limits.

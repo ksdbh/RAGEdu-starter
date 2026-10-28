@@ -2,6 +2,12 @@
 
 Inspected: **2026-10-28 (America/New_York)**. Baseline: `main`, commit `8093421d152233cfe9117594877cf6913a48af0b` (2026-01-19).
 
+## Follow-up delivered on 2026-10-28
+
+The eight-task restart pass restored the local demo after this investigation. See the [current handoff/changelog](changelog.md) and [README](https://github.com/ksdbh/RAGEdu-starter/blob/main/README.md) for current commands and results. Backend checks now pass 45 tests; frontend checks pass 3 tests, TypeScript, and production build. HTTP smoke checks pass directly and through the Next.js proxy. Mock auth is token-derived, health is stable, logs are portable, and empty/error retrieval no longer substitutes sources. Frontend home routing and dependency installation are repaired. Browser interaction and live CI results remain unverified; dependency security migration remains open.
+
+**Everything below records the pre-repair baseline at `8093421`; it is retained as investigation/history, not a claim that the repaired issues remain open.**
+
 ## Purpose and evidence standard
 
 The [README](https://github.com/ksdbh/RAGEdu-starter/blob/8093421d152233cfe9117594877cf6913a48af0b/README.md) calls the product **EduRAG**, while the repository, UI, and API use **RAGEdu**. Its stated audience is students asking questions about course materials and instructors supplying those materials and practice activities. The intended value is course-grounded answers with page citations; quizzes and syllabus-derived study quests extend that journey.

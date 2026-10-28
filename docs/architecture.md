@@ -1,5 +1,7 @@
 # Architecture
 
+> Updated 2026-10-28: consult the [current handoff](changelog.md) for verified implementation and commands. This older design/guidance page may describe disconnected or planned integrations. The active API uses demo clients, token-aware mock auth, one health schema, and no empty-evidence source fallback.
+
 This page explains how EduRAG is put together and how data flows through the system.
 
 At the highest level there are two main phases:
