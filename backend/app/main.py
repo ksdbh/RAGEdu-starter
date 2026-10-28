@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import itertools
+import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -113,7 +114,8 @@ def greeting(authorization: Optional[str] = Header(default=None)):
     return {"message": "Hello, student!"}
 
 # ---------------- RAG API -----------------------------------------------------
-LOG_PATH = Path("/app/logs/app.json")
+LOG_PATH = Path(os.environ.get("RAGEDU_LOG_PATH", "logs/app.json"))
+logger = logging.getLogger(__name__)
 
 @app.post("/rag/answer")
 def rag_answer(req: RagAnswerRequest):
@@ -137,8 +139,6 @@ def rag_answer(req: RagAnswerRequest):
     if top_k < 1:
         raise HTTPException(status_code=422, detail="top_k must be >= 1")
 
-    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-
     # Predictable fake clients for API tests (high scores so API path succeeds)
     class _FakeSearch:
         def search(self, query: str):
@@ -161,6 +161,7 @@ def rag_answer(req: RagAnswerRequest):
 
     # Structured JSONL log
     try:
+        LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with LOG_PATH.open("a", encoding="utf-8") as f:
             f.write(json.dumps({
                 "event": "rag_answer",
@@ -169,8 +170,8 @@ def rag_answer(req: RagAnswerRequest):
                 "q": q,
                 "top_k": top_k
             }) + "\n")
-    except Exception:
-        pass
+    except OSError:
+        logger.warning("Unable to write RAG request log", exc_info=True)
 
     if res["answer"] == GUARDRAIL_NEED_MORE_SOURCES:
         return {

@@ -30,7 +30,7 @@ backend-run:
 	@uvicorn backend.app.main:app --reload --port 8000
 
 backend-test:
-	@if [ -d backend ]; then cd backend && pytest -q; else echo "No backend directory found"; fi
+	@if [ -d backend ]; then python -m pytest -q; else echo "No backend directory found"; fi
 
 # Ingest: call the backend CLI. Usage: make ingest FILE=path/to/file.pdf [COURSE=CS101]
 ingest:

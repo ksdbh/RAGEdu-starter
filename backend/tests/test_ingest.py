@@ -2,7 +2,7 @@ import sys
 import types
 import pytest
 
-from app import ingest
+from backend.app import ingest
 
 
 def test_chunk_pages_heading_aware():

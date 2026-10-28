@@ -1,6 +1,6 @@
 import pytest
 
-from app.rag import (
+from backend.app.rag import (
     OpenSearchClientInterface,
     LLMAdapterInterface,
     answer_query,
