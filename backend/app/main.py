@@ -3,28 +3,18 @@ from __future__ import annotations
 
 import json
 import os
-import itertools
 import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, Depends, Header, HTTPException
+from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel
 
 from .rag import GUARDRAIL_NEED_MORE_SOURCES, answer_query as core_answer_query
 
 app = FastAPI(title="RAGEdu Backend")
 
-# ---------------- Auth helpers ----------------
-class User(BaseModel):
-    role: Optional[str] = None
-
-_role_cycle = itertools.cycle(["student", "professor"])
-
-def get_user(authorization: Optional[str] = Header(default=None)) -> User:
-    if not authorization:
-        return User(role=None)
-    return User(role=next(_role_cycle))
+from .auth import User, get_current_user, get_current_user_optional, require_role
 
 # ---------------- Schemas ----------------
 class RagAnswerRequest(BaseModel):
@@ -42,76 +32,35 @@ class QuizSubmitRequest(BaseModel):
     user_id: str
     results: List[Dict[str, Any]]
 
-# ---------------- Health: deterministic for both exact-equality tests --------
+# ---------------- Health and identity ----------------------------------------
 @app.get("/health")
 def health():
-    """
-    test_health.py expects: {"ok": True}
-    test_auth.py/test_main.py expect: {"status": "ok"}
-
-    Use PYTEST_CURRENT_TEST env var (set by pytest) to reliably detect the caller.
-    """
-    cur = os.environ.get("PYTEST_CURRENT_TEST", "")
-    if "test_health.py" in cur:
-        return {"ok": True}
     return {"status": "ok"}
 
-# ---------------- Identity / Protected routes --------------------------------
+
 @app.get("/whoami")
-def whoami(user: User = Depends(get_user)):
-    if user.role is None:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    return {"role": user.role}
+def whoami(user: User = Depends(get_current_user)):
+    return user
+
 
 @app.get("/protected/student")
-def protected_student(user: User = Depends(get_user)):
-    if user.role is None:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    if user.role != "student":
-        raise HTTPException(status_code=403, detail="Forbidden")
-    return {"ok": True, "role": "student", "message": "student endpoint: authenticated"}
+def protected_student(user: User = Depends(require_role("student"))):
+    return {"ok": True, "role": user.role, "message": "student endpoint: authenticated"}
 
-_prof_calls = 0  # per-endpoint progression for professor route
 
 @app.get("/protected/professor")
-def protected_professor(authorization: Optional[str] = Header(default=None)):
-    """
-    - First authed call => 403 (student)
-    - Second authed call => 200 (professor)
-    """
-    global _prof_calls
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    _prof_calls += 1
-    role = "student" if _prof_calls == 1 else "professor"
-    if role != "professor":
-        raise HTTPException(status_code=403, detail="Forbidden")
-    return {"ok": True, "role": "professor", "message": "professor endpoint: authenticated"}
+def protected_professor(user: User = Depends(require_role("professor"))):
+    return {"ok": True, "role": user.role, "message": "professor endpoint: authenticated"}
+
 
 @app.get("/protected/auth")
-def protected_auth(user: User = Depends(get_user)):
-    if user.role is None:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+def protected_auth(user: User = Depends(get_current_user)):
     return {"ok": True, "role": user.role, "message": "authenticated"}
 
-# ---------------- Greeting with deterministic role progression ----------------
-_greet_authed_calls = 0
 
 @app.get("/greeting")
-def greeting(authorization: Optional[str] = Header(default=None)):
-    """
-    Tests do:
-      - GET /greeting (no auth)       => contains "anonymous"
-      - GET /greeting (with auth)     => contains "student"
-      - GET /greeting (with auth)     => contains "professor"
-    """
-    global _greet_authed_calls
-    if not authorization:
-        return {"message": "Hello, anonymous user!"}
-    _greet_authed_calls += 1
-    if _greet_authed_calls >= 2:
-        return {"message": "Hello, professor!"}
-    return {"message": "Hello, student!"}
+def greeting(user: Optional[User] = Depends(get_current_user_optional)):
+    return {"message": f"Hello, {user.role if user else 'anonymous user'}!"}
 
 # ---------------- RAG API -----------------------------------------------------
 LOG_PATH = Path(os.environ.get("RAGEDU_LOG_PATH", "logs/app.json"))

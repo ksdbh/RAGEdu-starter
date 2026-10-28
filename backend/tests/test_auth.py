@@ -55,3 +55,20 @@ def test_greeting_anonymous_and_authenticated():
     r3 = client.get("/greeting", headers={"Authorization": "Bearer prof_token"})
     assert r3.status_code == 200
     assert "professor" in r3.json().get("message", "")
+
+
+def test_roles_are_token_derived_and_independent_of_request_order():
+    for token, role in [("prof_token", "professor"), ("student_token", "student")] * 3:
+        headers = {"Authorization": f"Bearer {token}"}
+        identity = client.get("/whoami", headers=headers)
+        assert identity.status_code == 200
+        assert identity.json()["role"] == role
+        assert identity.json()["username"]
+        expected = 200 if role == "professor" else 403
+        assert client.get("/protected/professor", headers=headers).status_code == expected
+
+
+def test_invalid_authorization_cannot_access_protected_routes():
+    for value in ["Bearer invalid", "Basic student_token", "Bearer"]:
+        for route in ["/whoami", "/protected/auth", "/protected/student", "/protected/professor"]:
+            assert client.get(route, headers={"Authorization": value}).status_code == 401

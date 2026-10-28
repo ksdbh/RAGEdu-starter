@@ -41,7 +41,7 @@ class MockCognitoClient(CognitoClientInterface):
     """
 
     def verify_token(self, token: str) -> Dict[str, str]:
-        logger.debug("Mock verify_token called with token=%s", token)
+        logger.debug("Verifying local mock identity")
         if not token:
             raise HTTPException(status_code=401, detail="Missing auth token")
 
