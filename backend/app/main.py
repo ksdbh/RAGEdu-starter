@@ -126,23 +126,15 @@ def rag_answer(req: RagAnswerRequest):
         return {
             "answer": "Not enough context to answer confidently.",
             "citations": [],
-            "metadata": {"top_k": top_k, "course_id": req.course_id, "confidence": 0.0},
+            "metadata": {"top_k": top_k, "course_id": req.course_id, "confidence": 0.0, "mode": "demo"},
         }
 
     citations = res.get("citations") or []
-    if isinstance(citations, list) and citations and isinstance(citations[0], dict):
-        citations = citations[:3]
-    else:
-        citations = [
-            {"title": "Doc 1", "page": 1, "snippet": "Context A"},
-            {"title": "Doc 2", "page": 2, "snippet": "Context B"},
-            {"title": "Doc 3", "page": 3, "snippet": "Context C"},
-        ]
 
     return {
         "answer": res["answer"],
         "citations": citations,
-        "metadata": {"top_k": top_k, "course_id": req.course_id, "confidence": conf},
+        "metadata": {"top_k": top_k, "course_id": req.course_id, "confidence": conf, "mode": "demo"},
     }
 
 # ---------------- Quiz endpoints ---------------------------------------------

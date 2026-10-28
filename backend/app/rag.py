@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import math
 from typing import Any, Dict, List, Protocol, Sequence, TypedDict, Optional
 
 # Returned by guardrail when evidence quality is too low.
@@ -146,105 +148,53 @@ def answer_query(
     rerank: bool = True,
     min_similarity: float = 0.5,
 ) -> Dict[str, Any]:
+    """Retrieve evidence and generate only when usable sources meet the threshold.
+
+    Demo data belongs in an explicitly selected search client, never in an
+    empty/error fallback. Similarity is a retrieval signal, not answer accuracy.
     """
-    Central query→(retrieve)→guardrail→(LLM)→answer function.
-
-    Contract & behavior (codified by tests):
-    - Must accept a variety of search clients:
-        1) FakeSearchClient.search(q, top_k=..., rerank=...) -> list[dict]
-        2) FakeSearchClient.search(q) -> list[dict]
-        3) OpenSearch style: search(index=?, body={}) -> {'hits': {'hits': [...]}}
-    - Guardrail:
-        If we *obtained* real docs from the client and the best (top) similarity
-        score is below `min_similarity`, return NEED_MORE_SOURCES *without
-        calling the LLM*. This prevents wasting tokens on poor evidence.
-    - Fallback:
-        If we could not obtain any docs at all (client returns None/[] or raises
-        signature errors), inject a deterministic demo-corpus (three snippets)
-        so “happy-path” tests don’t fail spuriously.
-
-    Returns
-    -------
-    dict with keys:
-      - answer: str (starts with "ANSWER based on" on the happy path)
-      - citations: list[dict]  (title/page/snippet/score), capped by top_k
-      - citations_docs: the raw docs we used as basis for citations
-      - confidence: float, equal to the top similarity we observed
-    """
-    # 1) Fetch docs in a signature-tolerant way. Track whether we obtained a real result set.
-    docs: List[Dict[str, Any]] = []
-    obtained = False
-
+    if top_k < 1:
+        raise ValueError("top_k must be >= 1")
+    insufficient = {
+        "answer": GUARDRAIL_NEED_MORE_SOURCES,
+        "citations": [], "citations_docs": [], "confidence": 0.0,
+    }
     try:
-        # 1) kwargs style
-        res = search_client.search(question, top_k=top_k, rerank=rerank)
-        docs = list(res or [])
-        obtained = True
-    except Exception:
-        try:
-            # 2) positional-only style
-            res = search_client.search(question)
-            docs = list(res or [])
-            obtained = True
-        except Exception:
+        if callable(getattr(search_client, "knn_query", None)):
+            result = search_client.knn_query(question, top_k=top_k)
+        else:
             try:
-                # 3) OpenSearch style
-                body = {"query": {"match": {"_all": question}}}
-                res = search_client.search(index="docs", body=body)  # type: ignore
-                if isinstance(res, dict):
-                    docs = _normalize_opensearch_docs(res)
-                    obtained = True
-                else:
-                    obtained = False
-            except Exception:
-                obtained = False
-                docs = []
+                result = search_client.search(question, top_k=top_k, rerank=rerank)
+            except TypeError:
+                try:
+                    result = search_client.search(question)
+                except TypeError:
+                    result = search_client.search(
+                        index="docs", body={"size": top_k, "query": {"match": {"text": question}}}
+                    )
+        docs = _normalize_opensearch_docs(result) if isinstance(result, dict) else list(result or [])
+        usable = []
+        for doc in docs:
+            score = float(doc.get("score", 0.0))
+            if str(doc.get("snippet") or "").strip() and math.isfinite(score):
+                usable.append({**doc, "score": score})
+        docs = sorted(usable, key=lambda doc: doc["score"], reverse=True)[:top_k]
+    except Exception:
+        logging.getLogger(__name__).warning("Retrieval failed; refusing to generate an answer", exc_info=True)
+        return insufficient
 
-    # 2) If we obtained docs, compute top similarity and apply guardrail BEFORE any LLM call.
-    #    This is crucial for the test that provides low-scoring docs and expects us to *not* call the LLM.
-    if obtained and len(docs) > 0:
-        top_sim = max((float(d.get("score", 0.0)) for d in docs), default=0.0)
-        if top_sim < float(min_similarity):
-            return {
-                "answer": GUARDRAIL_NEED_MORE_SOURCES,
-                "citations": [],
-                "citations_docs": [],
-                "confidence": 0.0,
-            }
-    else:
-        # 3) Truly empty result set -> safe demo fallback so the "happy path" test doesn’t trip the guardrail.
-        docs = [
-            {"title": "Doc 1", "page": 1, "snippet": "Context A", "score": 0.9},
-            {"title": "Doc 2", "page": 2, "snippet": "Context B", "score": 0.8},
-            {"title": "Doc 3", "page": 3, "snippet": "Context C", "score": 0.7},
-        ]
+    if not docs or docs[0]["score"] < min_similarity:
+        return insufficient
 
-    # 4) Build the prompt for the LLM.
-    #    Includes an explicit "Sources:" line because some tests assert its presence.
-    contexts = [str(d.get("snippet", "")) for d in docs if d.get("snippet")]
+    contexts = [str(d["snippet"]) for d in docs]
     prompt = (
         "Use only the context below to answer.\n\n"
         + "\n".join(f"- {c}" for c in contexts)
         + f"\n\nQuestion: {question}\n"
         + "Sources: Provide citations to the retrieved snippets.\n"
-        + "Provide a concise response; this is a stubbed answer."
+        + "Provide a concise response."
     )
-
-    # 5) Call the LLM (we only reach here if the guardrail passed or we used the empty-results fallback).
-    try:
-        raw = llm_client.generate(prompt)
-    except RuntimeError as e:
-        # Some tests use a "NeverLLM" that raises to ensure the guardrail prevented calling the LLM.
-        # If we get that here, normalize to the guardrail response for determinism.
-        msg = str(e)
-        if "LLM should not be called when guardrail triggers" in msg or "NeverLLM" in msg:
-            return {
-                "answer": GUARDRAIL_NEED_MORE_SOURCES,
-                "citations": [],
-                "citations_docs": [],
-                "confidence": 0.0,
-            }
-        raise
+    raw = llm_client.generate(prompt)
 
     if isinstance(raw, dict):
         raw = raw.get("text") or raw.get("answer") or json.dumps(raw, ensure_ascii=False)

@@ -72,3 +72,54 @@ def test_guardrail_insufficient_similarity():
     assert res["answer"] == GUARDRAIL_NEED_MORE_SOURCES
     assert res["citations"] == []
     assert res["confidence"] == 0.0
+
+
+@pytest.mark.parametrize("result", [None, [], [{"snippet": "", "score": 0.9}], [{"snippet": "x", "score": float("nan")}], [{"snippet": "x", "score": "invalid"}]])
+def test_empty_or_unusable_evidence_never_calls_llm(result):
+    class Search:
+        def search(self, query, **kwargs):
+            return result
+
+    class NeverLLM:
+        def generate(self, prompt):
+            pytest.fail("LLM must not be called without usable evidence")
+
+    answer = answer_query("question", search_client=Search(), llm_client=NeverLLM())
+    assert answer["answer"] == GUARDRAIL_NEED_MORE_SOURCES
+    assert answer["citations"] == []
+    assert answer["confidence"] == 0.0
+
+
+def test_search_failure_never_calls_llm():
+    class Search:
+        def search(self, *args, **kwargs):
+            raise ConnectionError("offline")
+
+    class NeverLLM:
+        def generate(self, prompt):
+            pytest.fail("LLM must not be called after retrieval failure")
+
+    assert answer_query("question", search_client=Search(), llm_client=NeverLLM())["answer"] == GUARDRAIL_NEED_MORE_SOURCES
+
+
+def test_top_k_limits_prompt_and_citations_to_same_evidence():
+    docs = [{"title": "low", "snippet": "excluded passage", "score": 0.6},
+            {"title": "high", "snippet": "selected passage", "score": 0.9}]
+    llm = FakeLLM()
+    class Search:
+        def search(self, query):
+            return docs
+    result = answer_query("question", search_client=Search(), llm_client=llm, top_k=1)
+    assert [c["title"] for c in result["citations"]] == ["high"]
+    assert "selected passage" in llm.last_prompt
+    assert "excluded passage" not in llm.last_prompt
+
+
+def test_opensearch_hits_are_normalized_without_demo_fallback():
+    class Search:
+        def search(self, *, index, body):
+            assert body["size"] == 1
+            return {"hits": {"hits": [{"_source": {"title": "Lecture", "page": 4, "text": "Course evidence"}, "_score": 0.8}]}}
+    result = answer_query("question", search_client=Search(), llm_client=FakeLLM(), top_k=1)
+    assert result["citations"][0]["title"] == "Lecture"
+    assert result["citations"][0]["page"] == 4
