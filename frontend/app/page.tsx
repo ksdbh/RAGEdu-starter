@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { API_BASE } from '../lib/api';
 
 type Citation = {
   // The backend currently returns a free-form object for citations; these fields are common
@@ -19,17 +20,22 @@ export default function Home() {
   const [q, setQ] = useState('Explain Dijkstra vs A* with an example.');
   const [a, setA] = useState<string | null>(null);
   const [citations, setCitations] = useState<Citation[]>([]);
+  const [mode, setMode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function ask() {
+    if (!q.trim()) {
+      setError("Please enter a question.");
+      return;
+    }
+    setMode(null);
     setLoading(true);
     setA(null);
     setCitations([]);
     setError(null);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
-      const resp = await fetch(apiUrl + '/rag/answer', {
+      const resp = await fetch(API_BASE + '/rag/answer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: q, top_k: 5 })
@@ -42,6 +48,7 @@ export default function Home() {
 
       const data = (await resp.json()) as RagResponse;
       setA(data.answer);
+      setMode(data.metadata?.mode ?? null);
       setCitations(Array.isArray(data.citations) ? data.citations : []);
     } catch (err: any) {
       setError(err?.message ?? 'Unknown error');
@@ -53,9 +60,14 @@ export default function Home() {
   return (
     <main className="p-8 max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">RAGEdu</h1>
-      <p className="mb-4">Course-grounded Q&A with citations (stubbed).</p>
+      <p className="mb-4">Local Q&A demo. Answers and sample sources are simulated; no course documents have been ingested.</p>
+      <nav className="mb-4" aria-label="Demo pages">
+        <a href="/auth">Mock sign-in</a> · <a href="/demo">Alternate Q&A</a> · <a href="/quiz">Quiz demo</a> · <a href="/quest-map">Quest map demo</a>
+      </nav>
+      <label htmlFor="question">Your question</label>
 
       <textarea
+        id="question"
         className="w-full border p-3 rounded mb-2"
         rows={4}
         value={q}
@@ -70,14 +82,14 @@ export default function Home() {
         >
           {loading ? 'Thinking…' : 'Ask'}
         </button>
-        <small className="text-gray-600">API: {process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'}</small>
+        <small className="text-gray-600">Offline demo · no external model calls</small>
       </div>
 
-      {error && <div className="mt-4 text-red-600">Error: {error}</div>}
+      {error && <div role="alert" className="mt-4 text-red-600">Error: {error}</div>}
 
       {a && (
         <div className="mt-6 border rounded p-4 whitespace-pre-wrap">
-          <h2 className="font-semibold mb-2">Answer</h2>
+          <h2 className="font-semibold mb-2">{mode === "demo" ? "Demo answer" : "Answer"}</h2>
           <div>{a}</div>
 
           <div className="mt-4">
@@ -96,11 +108,8 @@ export default function Home() {
                         </a>
                       </div>
                     ) : null}
-                    {c.excerpt ? <div className="text-sm text-gray-700 mt-1">{c.excerpt}</div> : null}
-                    {/* Render any other metadata in a small monospace block for inspection */}
-                    {Object.keys(c).length > 0 ? (
-                      <pre className="text-xs bg-gray-50 p-2 rounded mt-2 overflow-auto">{JSON.stringify(c, null, 2)}</pre>
-                    ) : null}
+                    <div>Page: {c.page ?? "?"}</div>
+                    <p>{c.snippet ?? c.excerpt ?? "No passage available."}</p>
                   </li>
                 ))}
               </ul>

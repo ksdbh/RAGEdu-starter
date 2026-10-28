@@ -14,7 +14,7 @@ export default function AuthWidget({ onChange }) {
   async function fetchWhoami(token) {
     setLoading(true);
     try {
-      const res = await fetch("/whoami", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch("/api/backend/whoami", { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
         setUser(null);
         onChange && onChange(null);

@@ -15,12 +15,14 @@ services:
       opensearch:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL","curl -fsS http://localhost:8000/health || exit 1"]
+      test: ["CMD", "python", "-c", "import json, urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)) == {'status': 'ok'}"]
       interval: 5s
       timeout: 2s
       retries: 30
 
   frontend:
+    environment:
+      BACKEND_URL: "http://backend:8000"
     build:
       context: .
       dockerfile: frontend/Dockerfile

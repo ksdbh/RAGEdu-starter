@@ -1,8 +1,9 @@
 "use client"
 
 import React, { useState } from "react";
+import { API_BASE } from "../../lib/api";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = API_BASE;
 
 export default function QuizPage() {
   const [query, setQuery] = useState("graph algorithms");
@@ -47,12 +48,14 @@ export default function QuizPage() {
 
     // send to backend
     try {
-      await fetch(`${API_URL}/quiz/submit`, {
+      const response = await fetch(`${API_URL}/quiz/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quiz_id: quiz.quiz_id, user_id: null, results }),
+        body: JSON.stringify({ quiz_id: quiz.quiz_id, user_id: "demo-student", results }),
       });
+      if (!response.ok) throw new Error(`Submission failed: ${response.status}`);
     } catch (err) {
+      alert("Could not submit demo results. Your score above was calculated locally.");
       console.error("Failed to record results", err);
     }
     setSubmitting(false);
@@ -60,7 +63,8 @@ export default function QuizPage() {
 
   return (
     <main className="p-8 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">RAGEdu — Quiz</h1>
+      <h1 className="text-2xl font-bold mb-4">RAGEdu — Quiz demo</h1>
+      <p>Simulated questions. Scores are calculated locally and are not saved.</p>
       <div className="mb-4">
         <label className="mb-2 block">Quiz topic / seed query</label>
         <div className="flex gap-2 items-center">

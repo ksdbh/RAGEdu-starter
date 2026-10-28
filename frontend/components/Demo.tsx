@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE } from "../lib/api";
 
 export type Citation = {
   title?: string;
@@ -29,7 +30,7 @@ export default function Demo(): JSX.Element {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
+  const apiBase = API_BASE;
 
   async function ask() {
     setError(null);
@@ -61,7 +62,7 @@ export default function Demo(): JSX.Element {
       // backend may return different shapes; be defensive
       setAnswer(data.answer ?? data.text ?? "");
       setCitations(Array.isArray(data.citations) ? data.citations : []);
-      setConfidence(data.confidence ?? null);
+      setConfidence(data.metadata?.confidence ?? null);
     } catch (err: any) {
       setError(err?.message ?? String(err));
     } finally {
@@ -94,12 +95,14 @@ export default function Demo(): JSX.Element {
   return (
     <div style={{ maxWidth: 780, margin: "24px auto", padding: 16, fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial" }}>
       <h2 style={{ margin: "0 0 12px 0" }}>RAG Demo</h2>
+      <p>Simulated answers and sources. Retrieval score indicates sample match strength, not answer accuracy.</p>
 
       <div style={{ marginBottom: 12 }}>
         <textarea
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask a question about the uploaded documents..."
+          aria-label="Your question"
+          placeholder="Try a question with simulated sources..."
           rows={4}
           style={{ width: "100%", padding: 12, fontSize: 14, borderRadius: 6, border: "1px solid #e5e7eb" }}
           data-testid="question-input"

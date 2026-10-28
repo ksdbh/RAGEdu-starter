@@ -12,7 +12,7 @@ export default function Home() {
         return;
       }
       try {
-        const res = await fetch("/whoami", {
+        const res = await fetch("/api/backend/whoami", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) {
