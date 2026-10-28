@@ -41,3 +41,7 @@ coverage/
 dist/
 build/
 site/
+
+# Local request logs and TypeScript build cache
+logs/
+*.tsbuildinfo

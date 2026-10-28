@@ -1,3 +1,4 @@
+import { describe, test, expect } from "vitest";
 import { getConfidenceLabel } from "../components/Demo";
 
 describe("getConfidenceLabel", () => {
