@@ -1,79 +1,18 @@
-# Backend Endpoints — Reference
+# Backend endpoints
 
-> Updated 2026-10-28: consult the [current handoff](../changelog.md) for verified implementation and commands. This older design/guidance page may describe disconnected or planned integrations. The active API uses demo clients, token-aware mock auth, one health schema, and no empty-evidence source fallback.
+Current implementation: `backend/app/main.py`. Updated October 30, 2026.
 
-This reference lists the main backend HTTP endpoints and their contracts. Keep this document in sync with backend/app/main.py and backend/app/rag.py.
+| Method/path | Behavior |
+| --- | --- |
+| `GET /health` | Always `{"status":"ok"}`; caller-independent. |
+| `GET /whoami` | Token-derived mock identity; missing/invalid credentials return 401. |
+| `GET /protected/student` | Requires student role; 403 for another valid role. |
+| `GET /protected/professor` | Requires professor role; 403 for another valid role. |
+| `GET /protected/auth` | Any valid mock identity. |
+| `GET /greeting` | Anonymous or token-derived role greeting. |
+| `GET /rag/status` | Explicit local/demo mode and indexed course counts. |
+| `POST /rag/answer` | Simulated demo or course-filtered keyword/source-excerpt response. See [Q&A contract](rag-api.md). |
+| `POST /quiz/generate` | Prototype questions based on `query`; `num_questions` is clamped to 1..20. No actual course retrieval. |
+| `POST /quiz/submit` | Requires string `quiz_id`, string `user_id`, nonempty `results`; counts client-supplied `correct` flags. Does not persist scores. |
 
-Common headers
-
-- Authorization: Bearer <token> (supports mock tokens in dev)
-
-Endpoints
-
-1) GET /health
-
-- Purpose: Health check
-- Response: 200 OK with JSON {"status": "ok"}
-- Where to change: backend/app/main.py
-
-2) GET /whoami
-
-- Purpose: Return current user info (mock or real Cognito)
-- Response schema: {"sub": "string", "username": "string", "role": "string", "email": "string?"}
-- Where to change: backend/app/auth.py::get_current_user
-
-3) POST /rag/answer
-
-- Purpose: Answer a user question grounded in course materials using retrieval + LLM.
-
-API Contract: /rag/answer
-
-Request schema (JSON):
-
-{
-  "course_id": "string",   # required — which course corpus to query
-  "question": "string",    # required — user question
-  "top_k": 5,               # optional — number of retrieved passages (default 5)
-  "max_tokens": 512         # optional — LLM generation limit
-}
-
-Response schema (JSON):
-
-{
-  "answer": "string",
-  "sources": [
-    {"text": "string", "page": 1, "section": "string", "score": 0.95}
-  ],
-  "llm_raw": { /* provider-specific raw response */ }
-}
-
-Validation rules
-
-- course_id: non-empty string.
-- question: min length 3 characters.
-- top_k: integer 1..20.
-- max_tokens: integer > 0 and <= 2048 (provider-dependent).
-
-Example curl
-
-```bash
-curl -X POST http://localhost:8000/rag/answer \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer student_token" \
-  -d '{"course_id":"CS101","question":"What is a RAG system?","top_k":3}'
-```
-
-Where to change implementation
-
-!!! info "Where to edit"
-    Source: docs/backend/endpoints.md
-    Public contract: docs/backend/endpoints.md#raganswer
-    Implementation: backend/app/rag.py :: answer_query (or similar)
-    Route registration: backend/app/main.py
-    Tests: backend/tests/test_rag.py (if present)
-
-Tests
-
-- Add unit tests that assert validation rules and that the /rag/answer route calls the retrieval pipeline and returns the expected schema.
-
-<!-- TODO: If backend/app/rag.py does not exist, create a minimal implementation and tests. -->
+Local mock tokens include `student_token`, `prof_token`, and `mock:alice|professor`. Cognito verification is a placeholder. The study and quiz endpoints do not enforce course authorization. There is no upload/document-serving/course-management HTTP API; use the [local ingestion CLI](../guides/local-course-search.md) for the current offline path.

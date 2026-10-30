@@ -1,14 +1,15 @@
-# Getting started — local Q&A demo
+# Getting started — local course search
 
-The current milestone is an offline demo with simulated answers and sample citations. It does not ingest PDFs yet. See the [current handoff](changelog.md) for verified status and [restart investigation](RESTART_BRIEF.md) for history.
+As of October 30, RAGEdu can ingest a real text PDF and return matching course excerpts with page citations. This uses keyword search, not semantic retrieval or model synthesis. The default simulated demo is still available. See the [current handoff](changelog.md) for exact verification.
 
-Use Python 3.11 and Node 20.19 or newer. From the repository root:
+Use Python 3.11 and Node 24.15+ (`.nvmrc` selects Node 24). From root:
 
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
-python -m uvicorn backend.app.main:app --reload --port 8000
+python -m backend.app.ingest backend/examples/graphs.pdf --course CS101
+RAGEDU_MODE=local python -m uvicorn backend.app.main:app --reload --port 8000
 ```
 
 In another terminal:
@@ -19,19 +20,19 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. The home page offers demo Q&A; `/auth` has local mock sign-in, `/demo` an alternate Q&A view, `/quiz` simulated practice questions, and `/quest-map` static quests.
+Open http://localhost:3000, choose CS101, and ask “What does Dijkstra require?” Citations should identify `graphs.pdf`, page 1. `/demo` uses the same UI; `/auth`, `/quiz`, and `/quest-map` remain mock/prototype screens. To use the simulated demo, start the API without `RAGEDU_MODE=local`.
 
-All frontend calls use `/api/backend`, forwarded by Next to `http://127.0.0.1:8000`. Override server-only `BACKEND_URL` before starting/building Next if needed; restart/rebuild after changing it. Compose supplies `http://backend:8000`. The older public frontend URL variables are no longer used. No credentials are required for the demo.
+The index defaults to root `data/courses.sqlite3`, ignored by Git. The CLI `--index` and API `RAGEDU_INDEX_PATH` must point to the same file. All frontend calls use the same-origin `/api/backend` proxy, forwarded to `http://127.0.0.1:8000` by default; server-only `BACKEND_URL` changes it before Next startup/build. No credentials or API calls are required.
 
-Health: `GET /health` returns `{"status":"ok"}`. Mock tokens `student_token` and `prof_token` produce stable identities; invalid credentials are rejected. These mocks are local-development behavior, not production identity verification.
+See the [local PDF search guide](guides/local-course-search.md) for supported PDF types, atomic reimports, isolation boundaries, HTTP contract, and failure behavior. No course authorization or production upload service is implemented.
 
 ```sh
 # Root, activated venv
 python -m pytest -q
-bash backend/scripts/e2e_smoke.sh
-BASE_URL=http://localhost:3000/api/backend bash backend/scripts/e2e_smoke.sh
+EXPECTED_MODE=local COURSE_ID=CS101 bash backend/scripts/e2e_smoke.sh
+EXPECTED_MODE=local COURSE_ID=CS101 BASE_URL=http://localhost:3000/api/backend bash backend/scripts/e2e_smoke.sh
 ```
 
-The smoke commands require running servers. Logs default to `logs/app.json`; `RAGEDU_LOG_PATH` overrides the destination. Tests isolate logs in temporary directories.
+Smoke checks require both servers and the sample PDF corpus. Frontend checks: `npm test`, `npm run typecheck`, `npm run build`, `npm audit`. Tests isolate request logs; runtime logs default to `logs/app.json` and can be changed with `RAGEDU_LOG_PATH`.
 
-Docker Compose is optional: `docker compose -f docker-compose.dev.yml up --build`. It also starts OpenSearch and LocalStack, which the current demo does not use. Full container startup has not been reverified in this restart pass. Review dependency advisories in the handoff before public hosting.
+Docker Compose remains optional and defaults to the simulated demo. It starts OpenSearch/LocalStack too, but neither is used by local SQLite retrieval, and host index files are not automatically mounted. Full container startup has not been reverified in this pass.

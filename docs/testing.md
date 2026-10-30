@@ -1,5 +1,7 @@
 # Testing
 
+The current [handoff](changelog.md) records 64 backend and 8 frontend DOM tests, TypeScript/build/audit checks, and live direct/proxy smoke in both local and demo modes. No real-browser visual/hydration check is implied by DOM tests.
+
 EduRAG relies on `pytest` tests under `backend/tests` to lock in the behavior of key endpoints and RAG primitives.
 
 ## What the tests guarantee

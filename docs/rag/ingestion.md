@@ -1,27 +1,17 @@
 # Ingestion
 
-> Updated 2026-10-28: consult the [current handoff](../changelog.md) for verified implementation and commands. This older design/guidance page may describe disconnected or planned integrations. The active API uses demo clients, token-aware mock auth, one health schema, and no empty-evidence source fallback.
+The active local path is **text PDF → pypdf extraction → bounded page passages → SQLite FTS5**. It does not compute semantic embeddings, upload to S3, or call Textract. See the [complete local guide](../guides/local-course-search.md).
 
-Ingestion pipeline responsibilities
+From repository root, after installing backend requirements:
 
-1. Extract text from uploaded files (Textract or PDF parser).
-2. Normalize whitespace and line breaks.
-3. Chunk text into passages with metadata (page, section, course_id).
-4. Compute embeddings and index vectors.
+```sh
+python -m backend.app.ingest backend/examples/graphs.pdf --course CS101
+```
 
-Quick ingest checklist (developer)
+Use `--index` (or `RAGEDU_INDEX_PATH`) to choose the SQLite file, `--title` for the display title, and `--max-chars` for passage length. The API must use that same index path in `RAGEDU_MODE=local`.
 
-- Confirm source file accessible (S3 or local path).
-- Run extraction step (Textract or PDF parser). See TODOs below.
-- Use chunk_pages (backend/app/ingest.py) to build chunks.
-- Use embeddings client to encode and index.
+Original page numbers survive blank-page omission. Passages carry source filename, content-based document identity, chunk identity, course/page/section metadata, and text. Identical-byte imports into the same course atomically replace passages without duplicates. Changed bytes form a distinct document; index version/deletion management remains future work.
 
-!!! note "Local dev"
-    The project includes a local ingest CLI at backend/app/ingest.py. Use `python -m app.ingest path/to/file.pdf --course CS101` from the backend/ folder.
+Encrypted PDFs, image-only/empty PDFs, unreadable files, and invalid input fail nonzero instead of reporting a successful ingest. OCR is not implemented. The size limit is 25 MiB. This is a trusted local CLI, not a hardened public upload service.
 
-Where to edit
-
-!!! info "Where to edit"
-    Source: docs/rag/ingestion.md
-    Ingest logic: backend/app/ingest.py
-    CLI: backend/app/ingest.py
+Code: `backend/app/ingest.py` and `backend/app/local_index.py`. Historical OpenSearch mapping/hash-embedding helpers remain separate scaffolding; they are not used in this path. See the [handoff](../changelog.md) before choosing cloud/semantic integrations.

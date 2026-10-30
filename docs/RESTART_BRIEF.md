@@ -2,6 +2,10 @@
 
 Inspected: **2026-10-28 (America/New_York)**. Baseline: `main`, commit `8093421d152233cfe9117594877cf6913a48af0b` (2026-01-19).
 
+## Follow-up delivered on 2026-10-30
+
+The [current handoff](changelog.md) now supersedes both the original baseline and the October 28 demo pass. The offline course path ingests actual text PDFs into a persistent SQLite keyword index and returns course-filtered source excerpts with real page citations. Next/React/test tooling was migrated; full npm audit reports zero vulnerabilities. Verified: 64 backend tests, 8 frontend DOM tests, production build/typecheck, and direct/proxy smoke in both modes. See the handoff for exact runtime/CI status and limits; semantic retrieval, model synthesis, authorization, and educational evaluation remain future work.
+
 ## Follow-up delivered on 2026-10-28
 
 The eight-task restart pass restored the local demo after this investigation. See the [current handoff/changelog](changelog.md) and [README](https://github.com/ksdbh/RAGEdu-starter/blob/main/README.md) for current commands and results. Backend checks now pass 45 tests; frontend checks pass 3 tests, TypeScript, and production build. HTTP smoke checks pass directly and through the Next.js proxy. Mock auth is token-derived, health is stable, logs are portable, and empty/error retrieval no longer substitutes sources. Frontend home routing and dependency installation are repaired. Browser interaction and live CI results remain unverified; dependency security migration remains open.

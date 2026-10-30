@@ -40,6 +40,7 @@ plugins:
 nav:
   - Home: index.md
   - Overview:
+      - Current handoff: changelog.md
       - Platform tour: platform-tour.md
       - FAQ: faq.md
   - Getting Started:
@@ -57,6 +58,7 @@ nav:
       - Embeddings: rag/embeddings.md
       - Retrieval: rag/retrieval.md
   - Guides:
+      - Local PDF search: guides/local-course-search.md
       - Add a new course: guides/add-course.md
       - Wire a real LLM provider: guides/real-llm.md
       - Switch vector store: guides/vector-store.md
