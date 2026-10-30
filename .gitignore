@@ -45,3 +45,8 @@ site/
 # Local request logs and TypeScript build cache
 logs/
 *.tsbuildinfo
+
+# Local course corpus (contains document text)
+data/
+*.sqlite3
+*.sqlite3-*

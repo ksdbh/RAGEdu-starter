@@ -22,8 +22,8 @@ def test_chunk_pages_heading_aware():
         meta = c["metadata"]
         assert "page" in meta
         assert meta.get("course_id") == "CS101"
-        assert "[page=" in c["text"]
-        assert "[section=" in c["text"]
+        assert len(c["text"]) <= 80
+        assert c["text"].strip()
 
     # Check that headings like INTRODUCTION and METHODS were used as sections
     sections = {c["metadata"]["section"] for c in chunks}

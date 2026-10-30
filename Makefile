@@ -32,11 +32,10 @@ backend-run:
 backend-test:
 	@if [ -d backend ]; then python -m pytest -q; else echo "No backend directory found"; fi
 
-# Ingest: call the backend CLI. Usage: make ingest FILE=path/to/file.pdf [COURSE=CS101]
+# Index a local text PDF. Run from the repository root.
 ingest:
-	@if [ -z "$(FILE)" ]; then echo "Usage: make ingest FILE=path/to.pdf [COURSE=course_id]"; exit 1; fi
-	@echo "Ingesting $(FILE)"
-	@cd backend && python -m app.ingest "$(FILE)" $(if [ -n "$(COURSE)" ]; then echo --course "$(COURSE)"; fi)
+	@if [ -z "$(FILE)" ] || [ -z "$(COURSE)" ]; then echo "Usage: make ingest FILE=path/to.pdf COURSE=CS101"; exit 1; fi
+	@python -m backend.app.ingest "$(FILE)" --course "$(COURSE)"
 
 # Frontend
 frontend-install:
