@@ -22,7 +22,7 @@ export function getConfidenceLabel(confidence: any): "low" | "medium" | "high" {
   return "medium";
 }
 
-export default function Demo(): JSX.Element {
+export default function Demo(): React.JSX.Element {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [citations, setCitations] = useState<Citation[]>([]);
