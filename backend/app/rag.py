@@ -209,6 +209,7 @@ def answer_query(
             "page": d.get("page"),
             "snippet": d.get("snippet") or "",
             "score": float(d.get("score", 0.0)),
+            **{key: d[key] for key in ("source", "document_id", "chunk_id", "course_id", "section") if key in d},
         })
 
     # Confidence is the observed top similarity for the docs we used here.

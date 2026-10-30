@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata = {
   title: 'RAGEdu',
-  description: 'Course-grounded Q&A with citations (stubbed)'
+  description: 'Course material search with page citations'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

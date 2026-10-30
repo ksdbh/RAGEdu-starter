@@ -43,15 +43,30 @@ jobs:
           set -euo pipefail
           uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 > /tmp/backend.log 2>&1 &
           backend_pid=$!
-          (cd frontend && npm run start -- --hostname 127.0.0.1) > /tmp/frontend.log 2>&1 &
+          node frontend/node_modules/next/dist/bin/next start frontend --hostname 127.0.0.1 > /tmp/frontend.log 2>&1 &
           frontend_pid=$!
-          trap 'kill "$backend_pid" "$frontend_pid" 2>/dev/null || true' EXIT
+          trap 'kill "$backend_pid" "$frontend_pid" 2>/dev/null || true; wait "$backend_pid" "$frontend_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:3000/api/backend/health; then break; fi
             sleep 1
           done
           bash backend/scripts/e2e_smoke.sh
           BASE_URL=http://127.0.0.1:3000/api/backend bash backend/scripts/e2e_smoke.sh
+      - name: Smoke test real PDF ingestion and course search
+        run: |
+          set -euo pipefail
+          python -m backend.app.ingest backend/examples/graphs.pdf --course CS101 --index /tmp/ragedu-ci.sqlite3
+          RAGEDU_MODE=local RAGEDU_INDEX_PATH=/tmp/ragedu-ci.sqlite3 uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 > /tmp/backend.log 2>&1 &
+          backend_pid=$!
+          node frontend/node_modules/next/dist/bin/next start frontend --hostname 127.0.0.1 > /tmp/frontend.log 2>&1 &
+          frontend_pid=$!
+          trap 'kill "$backend_pid" "$frontend_pid" 2>/dev/null || true; wait "$backend_pid" "$frontend_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/api/backend/health; then break; fi
+            sleep 1
+          done
+          EXPECTED_MODE=local COURSE_ID=CS101 bash backend/scripts/e2e_smoke.sh
+          EXPECTED_MODE=local COURSE_ID=CS101 BASE_URL=http://127.0.0.1:3000/api/backend bash backend/scripts/e2e_smoke.sh
       - name: Logs on failure
         if: failure()
         run: cat /tmp/backend.log /tmp/frontend.log 2>/dev/null || true

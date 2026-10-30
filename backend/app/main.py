@@ -4,13 +4,14 @@ from __future__ import annotations
 import json
 import os
 import logging
+import sqlite3
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from fastapi import FastAPI, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from .rag import GUARDRAIL_NEED_MORE_SOURCES, answer_query as core_answer_query
+from .study import StudyService, get_study_service
 
 app = FastAPI(title="RAGEdu Backend")
 
@@ -20,7 +21,7 @@ from .auth import User, get_current_user, get_current_user_optional, require_rol
 class RagAnswerRequest(BaseModel):
     query: Optional[str] = None
     question: Optional[str] = None
-    top_k: Optional[int] = None
+    top_k: Optional[int] = Field(default=None, ge=1, le=20, strict=True)
     course_id: Optional[str] = None
 
 class QuizGenerateRequest(BaseModel):
@@ -67,7 +68,9 @@ LOG_PATH = Path(os.environ.get("RAGEDU_LOG_PATH", "logs/app.json"))
 logger = logging.getLogger(__name__)
 
 @app.post("/rag/answer")
-def rag_answer(req: RagAnswerRequest):
+def rag_answer(req: RagAnswerRequest, service: StudyService = Depends(get_study_service)):
+    if req.query is not None and req.question is not None:
+        raise HTTPException(status_code=422, detail="Supply query or question, not both")
     # Decide which field is present (tests send either 'query' or 'question')
     used_field = "question" if req.question is not None else ("query" if req.query is not None else None)
     q = (req.query if req.query is not None else req.question)
@@ -76,6 +79,8 @@ def rag_answer(req: RagAnswerRequest):
     if used_field == "query":
         if q is None or q.strip() == "":
             raise HTTPException(status_code=422, detail="query must be non-empty")
+        if len(q.strip()) > 1000:
+            raise HTTPException(status_code=422, detail="Query too long")
     elif used_field == "question":
         if q is None or q.strip() == "":
             raise HTTPException(status_code=400, detail="Question must be non-empty")
@@ -88,25 +93,13 @@ def rag_answer(req: RagAnswerRequest):
     if top_k < 1:
         raise HTTPException(status_code=422, detail="top_k must be >= 1")
 
-    # Predictable fake clients for API tests (high scores so API path succeeds)
-    class _FakeSearch:
-        def search(self, query: str):
-            return [
-                {"id": "d1", "title": "Doc 1", "page": 1, "snippet": "Context A", "score": 0.9},
-                {"id": "d2", "title": "Doc 2", "page": 2, "snippet": "Context B", "score": 0.8},
-                {"id": "d3", "title": "Doc 3", "page": 3, "snippet": "Context C", "score": 0.7},
-            ]
-
-    class _FakeLLM:
-        def generate(self, prompt: str, *, system: Optional[str] = None) -> str:
-            return "ANSWER based on provided context: stubbed answer."
-
-    res = core_answer_query(
-        q, search_client=_FakeSearch(), llm_client=_FakeLLM(),
-        top_k=top_k, rerank=True, min_similarity=0.1
-    )
-
-    conf = float(res.get("confidence", 0.9))
+    try:
+        result = service.answer(q.strip(), course_id=req.course_id, top_k=top_k)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except sqlite3.Error as exc:
+        logger.error("Local corpus is unavailable", exc_info=True)
+        raise HTTPException(status_code=503, detail="Local corpus is unavailable; verify the index configuration") from exc
 
     # Structured JSONL log
     try:
@@ -122,20 +115,16 @@ def rag_answer(req: RagAnswerRequest):
     except OSError:
         logger.warning("Unable to write RAG request log", exc_info=True)
 
-    if res["answer"] == GUARDRAIL_NEED_MORE_SOURCES:
-        return {
-            "answer": "Not enough context to answer confidently.",
-            "citations": [],
-            "metadata": {"top_k": top_k, "course_id": req.course_id, "confidence": 0.0, "mode": "demo"},
-        }
+    return result
 
-    citations = res.get("citations") or []
 
-    return {
-        "answer": res["answer"],
-        "citations": citations,
-        "metadata": {"top_k": top_k, "course_id": req.course_id, "confidence": conf, "mode": "demo"},
-    }
+@app.get("/rag/status")
+def rag_status(service: StudyService = Depends(get_study_service)):
+    try:
+        return service.status()
+    except sqlite3.Error as exc:
+        raise HTTPException(status_code=503, detail="Local corpus is unavailable; verify the index configuration") from exc
+
 
 # ---------------- Quiz endpoints ---------------------------------------------
 @app.post("/quiz/generate")
